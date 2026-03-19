@@ -1,0 +1,29 @@
+# node modules
+node_modules/
+
+# environment variables
+.env
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# build folders
+dist/
+build/
+
+# coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# lock files (optional)
+package-lock.json
+yarn.lock
