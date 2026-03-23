@@ -72,8 +72,9 @@ async function userLoginController(req, res) {
 
         const user = await userModel.findOne({ email }).select('+password');
         if (!user) {
-            return res.status(422).json({
-                statusCode: 422,
+            return res.status(401).json({
+
+                statusCode: 401,
                 status: 'failed',
                 message: "Invalid Credentials"
             });
@@ -81,8 +82,8 @@ async function userLoginController(req, res) {
 
         const isValidPassword = await user.comparePassword(password);
         if (!isValidPassword) {
-            return res.status(422).json({
-                statusCode: 422,
+            return res.status(401).json({
+                statusCode: 401,
                 status: 'failed',
                 message: "Invalid Credentials"
             });

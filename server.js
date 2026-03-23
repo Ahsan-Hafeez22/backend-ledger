@@ -7,7 +7,7 @@ let server;
 async function startServer() {
     console.log(port)
     await connectDB();
-    server = app.listen(port, () => {
+    server = app.listen(port, '0.0.0.0', () => {
         console.log(`Server running on port ${port}`);
     });
 }
