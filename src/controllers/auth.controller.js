@@ -58,7 +58,6 @@ async function userRegisterController(req, res) {
         });
     }
 }
-
 async function userLoginController(req, res) {
     try {
         const { email, password } = req.body;
@@ -119,23 +118,44 @@ async function userLoginController(req, res) {
         });
     }
 }
-
 async function userLogoutController(req, res) {
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        res.status(400).json({
-            statusCode: 400,
+    try {
+        console.log("Before logout:", req.cookies.token);
+        const token =
+            req.cookies.token ||
+            req.headers.authorization?.split(' ')[1];
+
+        if (!token) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: 'failed',
+                message: "User already logged out",
+            });
+        }
+
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: false,
+            sameSite: "Lax",
+        });
+
+        await tokenBlackList.create({ token });
+        console.log("After logout:", req.cookies.token);
+
+        return res.status(200).json({
+            statusCode: 200,
+            status: 'success',
+            message: "User logged out Successfully",
+        });
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        return res.status(500).json({
+            statusCode: 500,
             status: 'failed',
-            message: "User already logged out"
+            message: "Internal server error",
         });
     }
-    req.cookie("token", "");
-    await tokenBlackList.create({ token });
-    return res.status(200).json({
-        statusCode: 200,
-        status: 'success',
-        message: "User logged out Successfully"
-    });
 }
 
 module.exports = { userRegisterController, userLoginController, userLogoutController };
