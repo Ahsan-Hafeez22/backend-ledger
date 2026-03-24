@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
-
+const tokenBlacklistModel = require('../models/blacklist.model');
 const authMiddleware = async (req, res, next) => {
     try {
         const token =
@@ -9,6 +9,10 @@ const authMiddleware = async (req, res, next) => {
 
         if (!token) {
             return res.status(401).json({ message: 'Unauthorized' });
+        }
+        const blacklistedToken = await tokenBlacklistModel.findOne({ token });
+        if (blacklistedToken) {
+            return res.status(401).json({ message: 'Unauthorized, token is blacklisted' });
         }
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await userModel.findById(decoded.userId);
