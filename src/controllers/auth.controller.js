@@ -2,6 +2,10 @@ import userModel from '../models/user.model.js';
 import jwt from 'jsonwebtoken';
 import emailService from '../services/email.service.js';
 import tokenBlackList from '../models/blacklist.model.js';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import refreshTokenModel from '../models/refresh.model.js';
+import { generateAccessToken, generateRefreshToken, hashToken } from "../utils/token.js";
 
 async function userRegisterController(req, res) {
     try {
@@ -23,16 +27,19 @@ async function userRegisterController(req, res) {
                 message: "User already exists with this email"
             });
         }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await userModel.create({ email, name, password: hashedPassword });
 
-        const user = await userModel.create({ email, name, password });
 
-        const token = jwt.sign(
-            { userId: user._id },
-            process.env.JWT_SECRET,
-            { expiresIn: "1d" }
-        );
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken();
+        const hashToken = await hashToken(refreshToken);
 
-        res.cookie('token', token);
+        await refreshTokenModel.create({
+            userId: user._id,
+            token: hashToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
 
         emailService.sendRegistrationEmail(user.email, user.name)
             .catch(err => console.error('Error sending registration email:', err));
@@ -46,7 +53,8 @@ async function userRegisterController(req, res) {
                 email: user.email,
                 name: user.name
             },
-            accessToken: token
+            accessToken: accessToken,
+            refreshToken: refreshToken
         });
 
     } catch (error) {
@@ -89,13 +97,18 @@ async function userLoginController(req, res) {
             });
         }
 
-        const token = jwt.sign(
+        const accessToken = jwt.sign(
             { userId: user._id },
-            process.env.JWT_SECRET,
-            { expiresIn: "1d" }
+            process.env.JWT_ACCESS_SECRET,
+            { expiresIn: "15m" }
         );
 
-        res.cookie('token', token);
+        const refreshToken = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_ACCESS_SECRET,
+            { expiresIn: "7d" }
+        );
+
 
         return res.status(200).json({
             statusCode: 200,
@@ -133,7 +146,7 @@ async function userLogoutController(req, res) {
             });
         }
 
-        res.clearCookie("token", {
+        res.clearCookie("accesstoken", {
             httpOnly: true,
             secure: false,
             sameSite: "Lax",

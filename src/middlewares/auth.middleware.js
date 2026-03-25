@@ -15,7 +15,7 @@ const authMiddleware = async (req, res, next) => {
         if (blacklistedToken) {
             return res.status(401).json({ message: 'Unauthorized, token is blacklisted' });
         }
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
         const user = await userModel.findById(decoded.userId);
         if (!user) {
             return res.status(401).json({ message: 'User not found' });
@@ -43,7 +43,7 @@ const authSystemMiddleware = async (req, res, next) => {
         if (blacklistedToken) {
             return res.status(401).json({ message: 'Unauthorized, token is blacklisted' });
         }
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
         const user = await userModel.findById(decoded.userId).select('+systemUser');
         if (!user.systemUser) {
             return res.status(403).json({
