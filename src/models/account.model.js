@@ -1,5 +1,6 @@
-const mongoose = require("mongoose");
-const ledgerModel = require('./ledger.model')
+import mongoose from 'mongoose';
+import ledgerModel from './ledger.model.js';
+
 const accountSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
@@ -69,4 +70,4 @@ accountSchema.methods.getBalance = async function () {
 accountSchema.index({ user: 1, status: 1 });
 
 const accountModel = mongoose.model('Account', accountSchema);
-module.exports = accountModel;
+export default accountModel;

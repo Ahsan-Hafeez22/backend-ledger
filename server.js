@@ -1,6 +1,6 @@
-const app = require('./src/app');
-const connectDB = require('./src/config/db');
-require("dotenv").config();
+import "dotenv/config";
+import app from './src/app.js';
+import connectDB from './src/config/db.js';
 const port = process.env.PORT || 3000;
 
 let server;
@@ -14,4 +14,4 @@ async function startServer() {
 
 startServer();
 
-module.exports = { server }; 
+export { server }; 

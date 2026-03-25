@@ -1,9 +1,9 @@
-const transactionModel = require("../models/transaction.model");
-const accountModel = require("../models/account.model");
-const userModel = require("../models/user.model");
-const ledgerModel = require("../models/ledger.model");
-const mongoose = require("mongoose");
-const emailService = require('../services/email.service');
+import transactionModel from "../models/transaction.model.js";
+import accountModel from "../models/account.model.js";
+import userModel from "../models/user.model.js";
+import ledgerModel from "../models/ledger.model.js";
+import mongoose from "mongoose";
+import emailService from '../services/email.service.js';
 
 async function createTransaction(req, resp) {
     try {
@@ -246,14 +246,4 @@ async function createInitialFundTransaction(req, resp) {
     }
 }
 
-
-async function getUserAccountController(req, resp) {
-    try {
-        const user = await req.user;
-
-        return resp.status(200).json({ balance });
-    } catch (error) {
-        return resp.status(500).json({ message: "Internal Server Error" });
-    }
-}
-module.exports = { createTransaction, createInitialFundTransaction };
+export default { createTransaction, createInitialFundTransaction };

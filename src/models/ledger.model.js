@@ -1,5 +1,4 @@
-const e = require('express');
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const ledgerScema = new mongoose.Schema({
     account: {
@@ -44,4 +43,4 @@ ledgerScema.pre('findOneAndReplace', preventLedgerModification);
 
 
 const ledgerModel = mongoose.model('Ledger', ledgerScema);
-module.exports = ledgerModel;
+export default ledgerModel;
