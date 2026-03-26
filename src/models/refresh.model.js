@@ -16,10 +16,6 @@ const refreshSchema = new mongoose.Schema({
         type: Date,
         required: true,
     },
-    deviceInfo: {
-        type: String,
-        default: 'Unknown Device'
-    },
     isRevoked: {
         type: Boolean,
         default: false
