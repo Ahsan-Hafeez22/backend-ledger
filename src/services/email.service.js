@@ -2,8 +2,6 @@
 import nodemailer from "nodemailer";
 import 'dotenv/config';
 
-// Create transporter with OAuth2
-console.log(process.env.EMAIL_USER, process.env.CLIENT_ID, process.env.CLIENT_SECRET, process.env.REFRESH_TOKEN)
 const transporter = nodemailer.createTransport({
 
     service: 'gmail',

@@ -1,4 +1,5 @@
-import jwt from 'jsonwebtoken'
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 const generateAccessToken = (user) => {
     return jwt.sign(
@@ -20,4 +21,4 @@ const hashToken = (token) => {
     return crypto.createHash('sha256').update(token).digest('hex');
 };
 
-exports = { generateAccessToken, generateRefreshToken, hashToken };
+export { generateAccessToken, generateRefreshToken, hashToken };

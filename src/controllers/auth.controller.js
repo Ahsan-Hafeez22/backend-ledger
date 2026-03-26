@@ -1,9 +1,6 @@
 import userModel from '../models/user.model.js';
-import jwt from 'jsonwebtoken';
 import emailService from '../services/email.service.js';
 import tokenBlackList from '../models/blacklist.model.js';
-import bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import refreshTokenModel from '../models/refresh.model.js';
 import { generateAccessToken, generateRefreshToken, hashToken } from "../utils/token.js";
 
@@ -27,18 +24,17 @@ async function userRegisterController(req, res) {
                 message: "User already exists with this email"
             });
         }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await userModel.create({ email, name, password: hashedPassword });
+        const user = await userModel.create({ email, name, password });
 
 
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken();
-        const hashToken = await hashToken(refreshToken);
+        const hashedRefreshToken = hashToken(refreshToken);
 
         await refreshTokenModel.create({
             userId: user._id,
-            token: hashToken,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            token: hashedRefreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         });
 
         emailService.sendRegistrationEmail(user.email, user.name)
@@ -87,28 +83,24 @@ async function userLoginController(req, res) {
                 message: "Invalid Credentials"
             });
         }
-
+        console.log(user);
         const isValidPassword = await user.comparePassword(password);
         if (!isValidPassword) {
             return res.status(401).json({
                 statusCode: 401,
                 status: 'failed',
-                message: "Invalid Credentials"
+                message: "Invalid Password"
             });
         }
 
-        const accessToken = jwt.sign(
-            { userId: user._id },
-            process.env.JWT_ACCESS_SECRET,
-            { expiresIn: "15m" }
-        );
-
-        const refreshToken = jwt.sign(
-            { userId: user._id },
-            process.env.JWT_ACCESS_SECRET,
-            { expiresIn: "7d" }
-        );
-
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken();
+        const hashedRefreshToken = hashToken(refreshToken);
+        await refreshTokenModel.create({
+            userId: user._id,
+            token: hashedRefreshToken,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
 
         return res.status(200).json({
             statusCode: 200,
@@ -119,7 +111,8 @@ async function userLoginController(req, res) {
                 email: user.email,
                 name: user.name
             },
-            accessToken: token
+            accessToken: accessToken,
+            refreshToken: refreshToken,
         });
 
     } catch (error) {
@@ -133,7 +126,6 @@ async function userLoginController(req, res) {
 }
 async function userLogoutController(req, res) {
     try {
-        console.log("Before logout:", req.cookies.token);
         const token =
             req.cookies.token ||
             req.headers.authorization?.split(' ')[1];
@@ -145,12 +137,6 @@ async function userLogoutController(req, res) {
                 message: "User already logged out",
             });
         }
-
-        res.clearCookie("accesstoken", {
-            httpOnly: true,
-            secure: false,
-            sameSite: "Lax",
-        });
 
         await tokenBlackList.create({ token });
         console.log("After logout:", req.cookies.token);

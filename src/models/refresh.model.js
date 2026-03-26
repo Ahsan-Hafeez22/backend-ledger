@@ -15,7 +15,6 @@ const refreshSchema = new mongoose.Schema({
     expiresAt: {
         type: Date,
         required: true,
-        index: true
     },
     deviceInfo: {
         type: String,
