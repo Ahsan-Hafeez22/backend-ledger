@@ -25,7 +25,12 @@ const userSchema = new mongoose.Schema({
         default: false,
         immtable: true,
         select: false,
+    },
+    verified: {
+        type: Boolean,
+        default: false
     }
+
 },
     {
         timestamps: true

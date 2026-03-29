@@ -136,9 +136,61 @@ export const sendFailedTransactionEmail = async (userEmail, userName, amount, tr
     return sendEmail(userEmail, subject, text, html);
 };
 
+export const sendOtpEmail = async (userEmail, userName, otp) => {
+    const subject = `Your Ledger App Verification Code 🔐`;
+
+    const text = `Hello ${userName},\n\nYour OTP for Ledger App is: ${otp}\n\nThis code will expire in 1 minute. Do not share it with anyone.`;
+
+    const html = `
+    <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+        <div style="max-width: 500px; margin: auto; background: #ffffff; border-radius: 12px; padding: 30px; text-align: center;">
+            
+            <!-- Logo/Icon Area -->
+            <div style="margin-bottom: 20px;">
+                <span style="font-size: 42px;">🔐</span>
+            </div>
+
+            <h2 style="color: #222; margin-bottom: 8px;">Verification Code</h2>
+            
+            <p style="color: #555; font-size: 15px; line-height: 1.6;">
+                Hello <strong>${userName}</strong>,<br>
+                Use the following code to verify your account:
+            </p>
+
+            <!-- OTP Box -->
+            <div style="margin: 25px 0; padding: 18px 24px; background-color: #f8f9fa; border: 2px dashed #000; border-radius: 10px; display: inline-block;">
+                <span style="font-size: 28px; font-weight: 700; letter-spacing: 8px; color: #000;">
+                    ${otp}
+                </span>
+            </div>
+
+            <p style="color: #d32f2f; font-size: 13px; font-weight: 500; margin: 10px 0 20px;">
+                This code will expire in 1 minute
+            </p>
+
+            <div style="margin: 25px 0;">
+                <a href="#" style="display: inline-block; padding: 12px 28px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">
+                    Verify Now
+                </a>
+            </div>
+
+            <p style="color: #777; font-size: 13px; line-height: 1.5;">
+                If you didn't request this code, please ignore this email or contact our support team immediately.
+            </p>
+
+            <p style="color: #aaa; font-size: 12px; margin-top: 30px;">
+                © ${new Date().getFullYear()} Ledger App. All rights reserved.
+            </p>
+        </div>
+    </div>`;
+
+    return sendEmail(userEmail, subject, text, html);
+};
+
 // Default export (so you can import as: import emailService from './email.service.js')
 export default {
     sendRegistrationEmail,
     sendTransactionEmail,
-    sendFailedTransactionEmail
+    sendFailedTransactionEmail,
+    sendOtpEmail
 };
