@@ -35,4 +35,4 @@ function generateOtp() {
 }
 
 
-export { generateAccessToken, generateRefreshToken, hashToken, findRefreshToken, generateOtp };
+export default { generateAccessToken, generateRefreshToken, hashToken, findRefreshToken, generateOtp };

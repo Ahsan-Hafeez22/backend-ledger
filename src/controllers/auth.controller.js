@@ -8,13 +8,15 @@ import emailService from "../services/email.service.js";
 import tokenBlackList from "../models/blacklist.model.js";
 import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
-import {
-    generateOtp,
-    generateAccessToken,
-    generateRefreshToken,
-    hashToken,
-    findRefreshToken,
-} from "../utils/auth.utils.js";
+// import {
+//     authUtils.generateOtp,
+//     authUtils.generateAccessToken,
+//     authUtils.generateRefreshToken,
+//     authUtils.hashToken,
+//     authUtils.findRefreshToken,
+// } from "../utils/auth.utils.js";
+import authUtils from "../utils/auth.utils.js"
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
@@ -23,7 +25,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 async function register(req, res) {
     try {
-        const { email, name, password, ...rest } = req.body;
+        const { email, name, password, phone, dateOfBirth, country, defaultCurrency, role } = req.body;
 
         if (!email || !name || !password) {
             return res.status(400).json({
@@ -54,7 +56,7 @@ async function register(req, res) {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const rawOtp = generateOtp();
+        const rawOtp = authUtils.generateOtp();
         const otpHash = otpModel.hashOtp(rawOtp);
         const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000);   // 2 min
         const pendingExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
@@ -66,7 +68,7 @@ async function register(req, res) {
                     { email },
                     {
                         email,
-                        data: { name, password: hashedPassword, ...rest },
+                        data: { name, password: hashedPassword, },
                         expiresAt: pendingExpiresAt,
                     },
                     { upsert: true, session },
@@ -181,12 +183,12 @@ async function verifyOtp(req, res) {
             session.endSession();
         }
 
-        const accessToken = generateAccessToken(newUser);
-        const refreshToken = generateRefreshToken(newUser);
+        const accessToken = authUtils.generateAccessToken(newUser);
+        const refreshToken = authUtils.generateRefreshToken(newUser);
 
         await refreshTokenModel.create({
             userId: newUser._id,
-            token: hashToken(refreshToken),
+            token: authUtils.hashToken(refreshToken),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
 
@@ -260,7 +262,7 @@ async function resendOtp(req, res) {
             });
         }
 
-        const rawOtp = generateOtp();
+        const rawOtp = authUtils.generateOtp();
         const otpHash = otpModel.hashOtp(rawOtp);
         const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
@@ -346,12 +348,12 @@ async function login(req, res) {
             });
         }
 
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
+        const accessToken = authUtils.generateAccessToken(user);
+        const refreshToken = authUtils.generateRefreshToken(user);
 
         await refreshTokenModel.create({
             userId: user._id,
-            token: hashToken(refreshToken),
+            token: authUtils.hashToken(refreshToken),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
 
@@ -457,7 +459,7 @@ async function refreshToken(req, res) {
             });
         }
 
-        const tokenInDB = await findRefreshToken(refreshToken);
+        const tokenInDB = await authUtils.findRefreshToken(refreshToken);
         if (!tokenInDB) {
             return res.status(401).json({
                 statusCode: 401,
@@ -489,12 +491,12 @@ async function refreshToken(req, res) {
         // Rotate: delete old, issue new
         await refreshTokenModel.deleteOne({ _id: tokenInDB._id });
 
-        const newRefreshToken = generateRefreshToken(user);
-        const newAccessToken = generateAccessToken(user);
+        const newRefreshToken = authUtils.generateRefreshToken(user);
+        const newAccessToken = authUtils.generateAccessToken(user);
 
         await refreshTokenModel.create({
             userId: user._id,
-            token: hashToken(newRefreshToken),
+            token: authUtils.hashToken(newRefreshToken),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
 
@@ -553,7 +555,7 @@ async function forgotPassword(req, res) {
             });
         }
 
-        const rawOtp = generateOtp();
+        const rawOtp = authUtils.generateOtp();
         const otpHash = otpModel.hashOtp(rawOtp);
         const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
