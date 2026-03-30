@@ -11,9 +11,10 @@ const otpSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
-        pendingData: {
-            type: mongoose.Schema.Types.Mixed,
-            required: true
+        type: {
+            type: String,
+            enum: ['registration', 'forgot_password'],
+            required: true,
         },
         expiresAt: {
             type: Date,
@@ -28,7 +29,7 @@ const otpSchema = new mongoose.Schema(
 );
 
 // Compound index for fast active-OTP lookups
-otpSchema.index({ email: 1, isUsed: 1, expiresAt: 1 });
+otpSchema.index({ email: 1, type: 1, isUsed: 1, expiresAt: 1 });
 
 // TTL index — MongoDB auto-deletes expired docs
 otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -39,9 +40,11 @@ otpSchema.statics.hashOtp = function (rawOtp) {
 };
 
 // Static helper: find active OTP for email
-otpSchema.statics.findActive = function (email) {
+// type is optional — if not passed, finds any active OTP for that email
+otpSchema.statics.findActive = function (email, type) {
     return this.findOne({
         email,
+        ...(type && { type }),
         isUsed: false,
         expiresAt: { $gt: new Date() },
     });

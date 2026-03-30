@@ -30,5 +30,9 @@ const findRefreshToken = async (token) => {
 const hashToken = (token) => {
     return crypto.createHash('sha256').update(token).digest('hex');
 };
+function generateOtp() {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+}
 
-export { generateAccessToken, generateRefreshToken, hashToken, findRefreshToken };
+
+export { generateAccessToken, generateRefreshToken, hashToken, findRefreshToken, generateOtp };
