@@ -1,16 +1,24 @@
+// app.js
 import express from 'express';
 import cookieParser from "cookie-parser";
+import morgan from "morgan";
+
 import authRoutes from './routes/auth.routes.js';
 import accountRoutes from './routes/account.routes.js';
 import transactionRoutes from './routes/transaction.routes.js';
-import morgan from "morgan";
+
+import { apiLimiter, authLimiter } from './middlewares/rateLimiter.js';
 
 const app = express();
-app.use(cookieParser());
+
+// Global Middlewares
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan("dev"));
-app.use('/api/auth', authRoutes);
-app.use('/api/account', accountRoutes);
-app.use('/api/transaction', transactionRoutes);
+
+// ✅ Apply limiters only to their specific route groups
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/account', apiLimiter, accountRoutes);
+app.use('/api/transaction', apiLimiter, transactionRoutes);
 
 export default app;

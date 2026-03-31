@@ -14,20 +14,19 @@ import {
     resetPasswordDto,
     changePasswordDto,
 } from "../validators/auth.validator.js";
-
+import { otpLimiter, sensitiveLimiter } from "../middlewares/rateLimiter.js";
 
 router.get("/user", authMiddleware.authMiddleware, authController.currentUser);
 router.post("/register", validate(registerDto), authController.register);
-router.post("/verify-otp", validate(verifyOtpDto), authController.verifyOtp);
-router.post("/resend-otp", validate(resendOtpDto), authController.resendOtp);
+router.post("/verify-otp", validate(verifyOtpDto), otpLimiter, authController.verifyOtp);
+router.post("/resend-otp", validate(resendOtpDto), otpLimiter, authController.resendOtp);
 router.post("/login", validate(loginDto), authController.login);
 router.post("/logout", authMiddleware.authMiddleware, authController.logout);
 router.post("/refresh-token", validate(refreshTokenDto), authController.refreshToken);
-router.post("/change-password", authMiddleware.authMiddleware, validate(changePasswordDto), authController.changePassword);
-router.post("/forgot-password", validate(forgotPasswordDto), authController.forgotPassword);
-router.post("/verify-reset-otp", validate(verifyResetOtpDto), authController.verifyResetOtp);
-router.post("/reset-password", validate(resetPasswordDto), authController.resetPassword);
-
+router.post("/forgot-password", validate(forgotPasswordDto), sensitiveLimiter, authController.forgotPassword);
+router.post("/verify-reset-otp", validate(verifyResetOtpDto), otpLimiter, authController.verifyResetOtp);
+router.post("/reset-password", validate(resetPasswordDto), sensitiveLimiter, authController.resetPassword);
+router.post("/change-password", authMiddleware.authMiddleware, validate(changePasswordDto), sensitiveLimiter, authController.changePassword);
 // router.post("/logout-all")
 // router.post("/update-profile")
 // router.post("/delete-account")
