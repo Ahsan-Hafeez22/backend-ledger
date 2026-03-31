@@ -5,16 +5,18 @@ import "dotenv/config";
 import otpModel from "../models/otp.model.js";
 import userModel from "../models/user.model.js";
 import emailService from "../services/email.service.js";
+import googleAuthService from "../services/google.auth.service.js";
 import tokenBlackList from "../models/blacklist.model.js";
 import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
 import authUtils from "../utils/auth.utils.js";
-
+import { OAuth2Client } from 'google-auth-library';
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
 // Body: { email, name, password, ...anyExtraFields }
 // Creates a pendingUser and sends an OTP to verify email ownership.
 // ─────────────────────────────────────────────────────────────────────────────
+
 async function register(req, res) {
     try {
         const {
@@ -221,6 +223,71 @@ async function verifyOtp(req, res) {
         });
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/google
+// Body: { idToken }
+// Verifies the id token, creates the real user using the google auth, returns user.
+// ─────────────────────────────────────────────────────────────────────────────
+async function googleLogin(req, res) {
+    try {
+        const { idToken } = req.body;
+
+        if (!idToken) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "Id Token is required",
+            });
+        }
+
+        let googleProfile;
+        try {
+            googleProfile = await googleAuthService.verifyGoogleToken(idToken);
+        } catch (e) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "Invalid Id Token",
+            });
+
+        }
+
+        const { user, isNewUser, isGoogleLinked } = await googleAuthService.findOrCreateGoogleUser(googleProfile);
+        const accessToken = generateAccessToken(user);
+        const regreshToken = generateRefreshToken(user);
+
+        await refreshTokenModel.create({
+            userId: user._id,
+            token: authUtils.hashToken(refreshToken),
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        const message = isNewUser
+            ? "Account created successfully." :
+            isGoogleLinked ? "Google account linked successfully." :
+                "Google account linked successfully.";
+
+        return res.status(isNewUser ? 201 : 200).json({
+            statusCode: isNewUser ? 201 : 200,
+            status: 'success',
+            message,
+            isNewUser,
+            isGoogleLinked: isGoogleLinked ?? false,
+            user,
+            accessToken,
+            refreshToken,
+
+        });
+    } catch (error) {
+        console.error("[verifyOtp]", error);
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/resend-otp
