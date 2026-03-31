@@ -84,8 +84,8 @@ export const registerDto = z.object({
      */
     phone: z
         .string()
-        .regex(/^\+?[0-9\s\-\(\)]+$/, 'Invalid phone number format')
-        .optional(),
+        .regex(/^\+?[0-9\s\-\(\)]+$/, 'Invalid phone number format'),
+
 
     dateOfBirth: z.string().optional(),
 

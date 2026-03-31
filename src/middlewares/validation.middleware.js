@@ -33,21 +33,11 @@ export const validate = (schema) => async (req, res, next) => {
         next(); // Everything is clean — proceed to controller
     } catch (error) {
         if (error instanceof ZodError) {
-            /**
-             * ZodError.errors is an array of all validation failures.
-             * We map it to a clean format: [{ field, message }]
-             *
-             * Example ZodError.errors:
-             * [
-             *   { path: ['email'], message: 'Invalid email address' },
-             *   { path: ['password'], message: 'Must be at least 8 chars' }
-             * ]
-             */
             return res.status(400).json({
                 statusCode: 400,
                 status: 'failed',
                 message: 'Validation failed',
-                errors: error.errors.map((err) => ({
+                errors: error.issues.map((err) => ({  // ✅ .issues not .errors
                     field: err.path[0] ?? 'unknown',
                     message: err.message,
                 })),

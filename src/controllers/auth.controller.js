@@ -27,13 +27,6 @@ async function register(req, res) {
     try {
         const { email, name, password, phone, dateOfBirth, country, defaultCurrency, role } = req.body;
 
-        if (!email || !name || !password) {
-            return res.status(400).json({
-                statusCode: 400,
-                status: "failed",
-                message: "Email, name and password are required",
-            });
-        }
 
         const userAlreadyExists = await userModel.findOne({ email }).lean();
         if (userAlreadyExists) {
