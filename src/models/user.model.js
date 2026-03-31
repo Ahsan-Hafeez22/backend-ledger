@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from 'bcrypt';
+import { required } from "zod/mini";
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -30,8 +31,9 @@ const userSchema = new mongoose.Schema({
     phone: {
         type: String,
         trim: true,
-        sparse: true,           // Allows multiple null values
-        match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number']
+        match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number'],
+        required: [true, "Phone number is required"],
+
     },
 
     avatar: {
@@ -48,7 +50,6 @@ const userSchema = new mongoose.Schema({
         default: 'Pakistan'
     },
 
-    // Verification & Security
     verified: {
         type: Boolean,
         default: false
@@ -103,14 +104,12 @@ const userSchema = new mongoose.Schema({
 });
 
 // Password hashing middleware
-userSchema.pre("save", async function (next) {
-    if (!this.isModified("password")) return next();
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) return;
+    if (this.password.startsWith("$2b$")) return;
 
-    // Avoid re-hashing already hashed password
-    if (this.password.startsWith("$2b$")) return next();
-
-    this.password = await bcrypt.hash(this.password, 12);   // 12 is better than 10
-    next();
+    this.password = await bcrypt.hash(this.password, 12);
+    // No next() needed here; the function simply finishes
 });
 
 // Compare password method

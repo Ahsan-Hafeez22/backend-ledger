@@ -9,6 +9,15 @@ const pendingUserSchema = new mongoose.Schema(
         },
 
         data: {
+            // Required fields
+            name: { type: String, required: true },
+            password: { type: String, required: true },  // already hashed
+            phone: { type: String, required: true },
+            // ✅ Optional fields — store them too if user submitted them
+            dateOfBirth: { type: Date, default: null },
+            country: { type: String, default: 'Pakistan' },
+            defaultCurrency: { type: String, default: 'PKR' },
+            role: { type: String, default: 'user' },
             type: mongoose.Schema.Types.Mixed,
             required: true,
         },

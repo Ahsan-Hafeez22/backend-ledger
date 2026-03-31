@@ -30,5 +30,5 @@ router.post("/reset-password", validate(resetPasswordDto), authController.resetP
 
 // router.post("/logout-all")
 // router.post("/update-profile")
-
+// router.post("/delete-account")
 export default router;

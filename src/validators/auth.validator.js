@@ -5,6 +5,14 @@ import { z } from 'zod';
 // Define once, reuse across multiple schemas.
 // This avoids copy-pasting the same rules.
 // ─────────────────────────────────────────────────────────────────────────────
+/** Usage for Zod Package
+ * Required fields the client must send
+ * Format rules (email, phone regex, password strength)
+ * Length limits
+ * Transformations (trim, lowercase)
+ * Cross-field rules (newPassword !== oldPassword)
+ * Default values for optional fields
+ */
 
 /**
  * emailField — reused in register, login, resendOtp, forgotPassword, verifyOtp

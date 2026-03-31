@@ -8,15 +8,7 @@ import emailService from "../services/email.service.js";
 import tokenBlackList from "../models/blacklist.model.js";
 import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
-// import {
-//     authUtils.generateOtp,
-//     authUtils.generateAccessToken,
-//     authUtils.generateRefreshToken,
-//     authUtils.hashToken,
-//     authUtils.findRefreshToken,
-// } from "../utils/auth.utils.js";
-import authUtils from "../utils/auth.utils.js"
-
+import authUtils from "../utils/auth.utils.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
@@ -25,8 +17,16 @@ import authUtils from "../utils/auth.utils.js"
 // ─────────────────────────────────────────────────────────────────────────────
 async function register(req, res) {
     try {
-        const { email, name, password, phone, dateOfBirth, country, defaultCurrency, role } = req.body;
-
+        const {
+            email,
+            name,
+            password,
+            phone,
+            dateOfBirth,
+            country,
+            defaultCurrency,
+            role,
+        } = req.body;
 
         const userAlreadyExists = await userModel.findOne({ email }).lean();
         if (userAlreadyExists) {
@@ -51,7 +51,7 @@ async function register(req, res) {
         const hashedPassword = await bcrypt.hash(password, 10);
         const rawOtp = authUtils.generateOtp();
         const otpHash = otpModel.hashOtp(rawOtp);
-        const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000);   // 2 min
+        const otpExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 min
         const pendingExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
         const session = await mongoose.startSession();
@@ -61,7 +61,15 @@ async function register(req, res) {
                     { email },
                     {
                         email,
-                        data: { name, password: hashedPassword, },
+                        data: {
+                            name,
+                            password: hashedPassword,
+                            phone,
+                            dateOfBirth,
+                            country,
+                            defaultCurrency,
+                            role,
+                        },
                         expiresAt: pendingExpiresAt,
                     },
                     { upsert: true, session },
@@ -85,7 +93,10 @@ async function register(req, res) {
         try {
             await emailService.sendOtpEmail(email, name, rawOtp, otpExpiresAt);
         } catch (emailErr) {
-            console.error(`[register] Failed to send OTP email to ${email}:`, emailErr);
+            console.error(
+                `[register] Failed to send OTP email to ${email}:`,
+                emailErr,
+            );
             await otpModel.updateMany({ email, isUsed: false }, { isUsed: true });
             return res.status(500).json({
                 statusCode: 500,
@@ -118,14 +129,6 @@ async function verifyOtp(req, res) {
     try {
         const { email, otp } = req.body;
 
-        if (!email || !otp) {
-            return res.status(400).json({
-                statusCode: 400,
-                status: "failed",
-                message: "Email and OTP are required",
-            });
-        }
-
         // Find a valid, unused registration OTP
         const otpRecord = await otpModel.findActive(email, "registration");
         if (!otpRecord) {
@@ -143,6 +146,7 @@ async function verifyOtp(req, res) {
                 message: "Invalid OTP.",
             });
         }
+        // console.log("otpRecord", otpRecord);
 
         // Ensure the pending registration data still exists (10-min window)
         const pendingUser = await pendingUserModel.findOne({ email });
@@ -166,7 +170,22 @@ async function verifyOtp(req, res) {
                 );
 
                 [newUser] = await userModel.create(
-                    [{ email, verified: true, ...pendingUser.data }],
+                    [
+                        {
+                            email,
+                            verified: true,
+                            name: pendingUser.data.name,
+                            password: pendingUser.data.password,
+                            phone: pendingUser.data.phone,
+                            dateOfBirth: pendingUser.data.dateOfBirth,
+                            country: pendingUser.data.country,
+                            defaultCurrency: pendingUser.data.defaultCurrency,
+                            role: pendingUser.data.role,
+                            type: pendingUser.data.type,
+                            status: "active",
+                            emailVerifiedAt: new Date(),
+                        },
+                    ],
                     { session },
                 );
 
@@ -189,11 +208,7 @@ async function verifyOtp(req, res) {
             statusCode: 201,
             status: "success",
             message: "Account created successfully.",
-            user: {
-                _id: newUser._id,
-                email: newUser.email,
-                name: newUser.name,
-            },
+            user: newUser,
             accessToken,
             refreshToken,
         });
@@ -284,7 +299,10 @@ async function resendOtp(req, res) {
                 otpExpiresAt,
             );
         } catch (emailErr) {
-            console.error(`[resendOtp] Failed to send OTP email to ${email}:`, emailErr);
+            console.error(
+                `[resendOtp] Failed to send OTP email to ${email}:`,
+                emailErr,
+            );
             await otpModel.updateMany({ email, isUsed: false }, { isUsed: true });
             return res.status(500).json({
                 statusCode: 500,
@@ -354,11 +372,7 @@ async function login(req, res) {
             statusCode: 200,
             status: "success",
             message: "Logged in successfully",
-            user: {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-            },
+            user: user,
             accessToken,
             refreshToken,
         });
@@ -388,7 +402,6 @@ async function currentUser(req, res) {
                 name: user.name,
             },
         });
-
     } catch (error) {
         console.error("[getUser]", error);
         return res.status(500).json({
@@ -398,8 +411,6 @@ async function currentUser(req, res) {
         });
     }
 }
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/logout
@@ -561,7 +572,14 @@ async function forgotPassword(req, res) {
                     { session },
                 );
                 await otpModel.create(
-                    [{ email, otpHash, expiresAt: otpExpiresAt, type: "forgot_password" }],
+                    [
+                        {
+                            email,
+                            otpHash,
+                            expiresAt: otpExpiresAt,
+                            type: "forgot_password",
+                        },
+                    ],
                     { session },
                 );
             });
@@ -572,7 +590,10 @@ async function forgotPassword(req, res) {
         try {
             await emailService.sendOtpEmail(email, user.name, rawOtp, otpExpiresAt);
         } catch (emailErr) {
-            console.error(`[forgotPassword] Failed to send OTP to ${email}:`, emailErr);
+            console.error(
+                `[forgotPassword] Failed to send OTP to ${email}:`,
+                emailErr,
+            );
             await otpModel.updateMany({ email, isUsed: false }, { isUsed: true });
             return res.status(500).json({
                 statusCode: 500,
@@ -737,7 +758,8 @@ async function resetPassword(req, res) {
         return res.status(200).json({
             statusCode: 200,
             status: "success",
-            message: "Password reset successfully. Please log in with your new password.",
+            message:
+                "Password reset successfully. Please log in with your new password.",
         });
     } catch (error) {
         console.error("[resetPassword]", error);
@@ -772,7 +794,7 @@ async function changePassword(req, res) {
                 statusCode: 401,
                 status: "failed",
                 message: "Unauthorized",
-            })
+            });
         }
         const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
 
@@ -781,10 +803,9 @@ async function changePassword(req, res) {
             return res.status(401).json({
                 statusCode: 400,
                 status: "failed",
-                message: 'User not found'
+                message: "User not found",
             });
         }
-
 
         const isValidPassword = await user.comparePassword(oldPassword);
         if (!isValidPassword) {
@@ -833,5 +854,5 @@ export default {
     forgotPassword,
     verifyResetOtp,
     resetPassword,
-    changePassword
+    changePassword,
 };
