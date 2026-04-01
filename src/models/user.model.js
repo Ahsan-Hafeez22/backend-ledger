@@ -110,6 +110,15 @@ userSchema.pre("save", async function () {
     // No next() needed here; the function simply finishes
 });
 
+userSchema.set('toJSON', {
+    transform: (doc, ret) => {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        delete ret.password;
+        return ret;
+    }
+});
 // Compare password method
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);

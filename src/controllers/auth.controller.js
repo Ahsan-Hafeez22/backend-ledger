@@ -403,13 +403,6 @@ async function login(req, res) {
     try {
         const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({
-                statusCode: 400,
-                status: "failed",
-                message: "Email and password are required",
-            });
-        }
 
         const user = await userModel.findOne({ email }).select("+password");
         if (!user) {
@@ -419,6 +412,15 @@ async function login(req, res) {
                 message: "Invalid credentials",
             });
         }
+        if (user.googleId != null && user.password == null) {
+            return res.status(401).json({
+                statusCode: 401,
+                status: "failed",
+                message: "This account is associated with the google, try login using Google",
+            });
+
+        }
+        console.log("user", user);
         const isValidPassword = await user.comparePassword(password);
         if (!isValidPassword) {
             return res.status(401).json({
@@ -465,11 +467,7 @@ async function currentUser(req, res) {
         return res.status(200).json({
             statusCode: 200,
             status: "success",
-            user: {
-                _id: user._id,
-                email: user.email,
-                name: user.name,
-            },
+            user: user,
         });
     } catch (error) {
         console.error("[getUser]", error);
