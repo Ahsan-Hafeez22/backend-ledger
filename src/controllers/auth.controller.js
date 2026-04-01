@@ -10,7 +10,6 @@ import tokenBlackList from "../models/blacklist.model.js";
 import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
 import authUtils from "../utils/auth.utils.js";
-import { OAuth2Client } from 'google-auth-library';
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
 // Body: { email, name, password, ...anyExtraFields }
@@ -215,7 +214,7 @@ async function verifyOtp(req, res) {
             refreshToken,
         });
     } catch (error) {
-        console.error("[verifyOtp]", error);
+        console.error("[Google]", error);
         return res.status(500).json({
             statusCode: 500,
             status: "failed",
@@ -229,7 +228,7 @@ async function verifyOtp(req, res) {
 // Body: { idToken }
 // Verifies the id token, creates the real user using the google auth, returns user.
 // ─────────────────────────────────────────────────────────────────────────────
-async function googleLogin(req, res) {
+async function googleAuth(req, res) {
     try {
         const { idToken } = req.body;
 
@@ -252,10 +251,13 @@ async function googleLogin(req, res) {
             });
 
         }
+        console.log("googleProfile", googleProfile);
 
         const { user, isNewUser, isGoogleLinked } = await googleAuthService.findOrCreateGoogleUser(googleProfile);
-        const accessToken = generateAccessToken(user);
-        const regreshToken = generateRefreshToken(user);
+        console.log("Google User", user);
+
+        const accessToken = authUtils.generateAccessToken(user);
+        const refreshToken = authUtils.generateRefreshToken(user);
 
         await refreshTokenModel.create({
             userId: user._id,
@@ -279,7 +281,7 @@ async function googleLogin(req, res) {
 
         });
     } catch (error) {
-        console.error("[verifyOtp]", error);
+        console.error("[Google Auth]", error);
         return res.status(500).json({
             statusCode: 500,
             status: "failed",
@@ -922,4 +924,5 @@ export default {
     verifyResetOtp,
     resetPassword,
     changePassword,
+    googleAuth
 };

@@ -21,8 +21,6 @@ const userSchema = new mongoose.Schema({
 
     password: {
         type: String,
-        required: [true, 'Password is required'],
-        minLength: [8, 'Password must be at least 8 characters long'],
         select: false
     },
 
@@ -32,8 +30,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true,
         match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number'],
-        required: [true, "Phone number is required"],
-
+        required: false
     },
 
     avatar: {
@@ -105,6 +102,7 @@ const userSchema = new mongoose.Schema({
 
 // Password hashing middleware
 userSchema.pre("save", async function () {
+    if (!this.password) return;
     if (!this.isModified("password")) return;
     if (this.password.startsWith("$2b$")) return;
 

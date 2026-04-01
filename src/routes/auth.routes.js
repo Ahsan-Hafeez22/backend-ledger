@@ -27,6 +27,7 @@ router.post("/forgot-password", validate(forgotPasswordDto), sensitiveLimiter, a
 router.post("/verify-reset-otp", validate(verifyResetOtpDto), otpLimiter, authController.verifyResetOtp);
 router.post("/reset-password", validate(resetPasswordDto), sensitiveLimiter, authController.resetPassword);
 router.post("/change-password", authMiddleware.authMiddleware, validate(changePasswordDto), sensitiveLimiter, authController.changePassword);
+router.post("/google-auth", sensitiveLimiter, authController.googleAuth);
 // router.post("/logout-all")
 // router.post("/update-profile")
 // router.post("/delete-account")
