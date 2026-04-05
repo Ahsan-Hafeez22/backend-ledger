@@ -200,21 +200,19 @@ export const resetPasswordDto = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 export const changePasswordDto = z
     .object({
-        oldPassword: z
-            .string({ required_error: 'Old password is required' })
-            .min(1, 'Old password cannot be empty'),
+        oldPassword: passwordField,
 
         newPassword: passwordField,
     })
-    /**
-     * .refine() lets you add CUSTOM validation rules that span multiple fields.
-     * Here we check that oldPassword !== newPassword AT THE SCHEMA LEVEL.
-     * This means the controller never even sees this case — Zod handles it.
-     *
-     * First arg:  a function that returns true (valid) or false (invalid)
-     * Second arg: the error config if the check fails
-     */
-    .refine((data) => data.oldPassword !== data.newPassword, {
-        message: 'New password cannot be the same as your current password',
-        path: ['newPassword'], // Which field the error is attached to
-    });
+/**
+ * .refine() lets you add CUSTOM validation rules that span multiple fields.
+ * Here we check that oldPassword !== newPassword AT THE SCHEMA LEVEL.
+ * This means the controller never even sees this case — Zod handles it.
+ *
+ * First arg:  a function that returns true (valid) or false (invalid)
+ * Second arg: the error config if the check fails
+ */
+// .refine((data) => data.oldPassword !== data.newPassword, {
+//     message: 'New password cannot be the same as your current password',
+//     path: ['newPassword'], // Which field the error is attached to
+// });

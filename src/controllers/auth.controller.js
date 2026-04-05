@@ -736,7 +736,7 @@ async function verifyResetOtp(req, res) {
         // /reset-password will only work if this token is present and valid.
         const resetToken = jwt.sign(
             { userId: user._id, purpose: "reset_password" },
-            process.env.JWT_REFRESH_SECRET,
+            process.env.JWT_RESET_SECRET,
             { expiresIn: "10m" },
         );
 
@@ -766,18 +766,11 @@ async function resetPassword(req, res) {
     try {
         const { resetToken, password } = req.body;
 
-        if (!resetToken || !password) {
-            return res.status(400).json({
-                statusCode: 400,
-                status: "failed",
-                message: "Reset token and new password are required",
-            });
-        }
-
         // Verify the reset token — proves /verify-reset-otp was called successfully
+        console.log(resetToken, password);
         let decoded;
         try {
-            decoded = jwt.verify(resetToken, process.env.JWT_REFRESH_SECRET);
+            decoded = jwt.verify(resetToken, process.env.JWT_RESET_SECRET);
         } catch (err) {
             return res.status(400).json({
                 statusCode: 400,
@@ -798,6 +791,7 @@ async function resetPassword(req, res) {
         }
 
         const user = await userModel.findById(decoded.userId).select("+password");
+        console.log("user", user);
         if (!user) {
             return res.status(404).json({
                 statusCode: 404,
@@ -805,9 +799,17 @@ async function resetPassword(req, res) {
                 message: "User not found",
             });
         }
-
+        if (user.password == null && user.googleId != null) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "This account is associated with the google, try login using Google",
+            });
+        }
         // Prevent reusing the same password
-        const isSamePassword = await bcrypt.compare(password, user.password);
+        const isSamePassword = await user.comparePassword(password);
+        // bcrypt.compare(user.password, password)
+        console.log("IsSamePass word", isSamePassword);
         if (isSamePassword) {
             return res.status(400).json({
                 statusCode: 400,
@@ -815,7 +817,6 @@ async function resetPassword(req, res) {
                 message: "New password cannot be the same as your current password.",
             });
         }
-
         user.password = await bcrypt.hash(password, 10);
         await user.save();
 
@@ -845,16 +846,8 @@ async function resetPassword(req, res) {
 // Also matches if the old password matches with the current password.
 // ─────────────────────────────────────────────────────────────────────────────
 async function changePassword(req, res) {
+    const { oldPassword, newPassword } = req.body;
     try {
-        const { oldPassword, newPassword } = req.body;
-        if (!oldPassword || !newPassword) {
-            return res.status(400).json({
-                statusCode: 400,
-                status: "failed",
-                message: "old password and new password are required",
-            });
-        }
-
         const token = req.headers.authorization?.split(" ")[1] || "";
         if (!token) {
             return res.status(401).json({
@@ -867,7 +860,7 @@ async function changePassword(req, res) {
 
         const user = await userModel.findById(decoded.userId).select("+password");
         if (!user) {
-            return res.status(401).json({
+            return res.status(400).json({
                 statusCode: 400,
                 status: "failed",
                 message: "User not found",
@@ -910,6 +903,49 @@ async function changePassword(req, res) {
     }
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/delete-account
+// Body: User get from the access token
+// Delete accont and make the token black list
+// ─────────────────────────────────────────────────────────────────────────────
+async function deleteAccount(req, res) {
+    try {
+        const user = req.user;
+
+        const result = await userModel.deleteOne({ _id: user._id });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                status: "failed",
+                message: "User not found or already deleted.",
+            });
+        }
+        const token = req.headers.authorization?.split(" ")[1];
+
+        if (token) {
+            await tokenBlackList.create({ token });
+        }
+
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Account deleted successfully.",
+        });
+
+    } catch (error) {
+        console.error("[deleteAccount]", error);
+
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
+
 export default {
     currentUser,
     register,
@@ -922,5 +958,6 @@ export default {
     verifyResetOtp,
     resetPassword,
     changePassword,
-    googleAuth
+    googleAuth,
+    deleteAccount
 };
