@@ -1,4 +1,7 @@
 import accountModel from '../models/account.model.js';
+import bcrypt from 'bcrypt';
+
+
 
 async function createAccount(req, resp) {
     try {
@@ -6,7 +9,6 @@ async function createAccount(req, resp) {
         const user = req.user;
 
         const accountAlreadyExists = await accountModel.findOne({ user: user._id }).lean();
-        const account = await accountModel.create({ user: user._id, accountTitle, pin });
         if (accountAlreadyExists) {
             return resp.status(422).json({
                 statusCode: 422,
@@ -14,6 +16,7 @@ async function createAccount(req, resp) {
                 message: "An account with this title already exists",
             });
         }
+        const account = await accountModel.create({ user: user._id, accountTitle, pin });
         return resp.status(201).json(
             {
                 statusCode: 201,
@@ -24,6 +27,81 @@ async function createAccount(req, resp) {
         );
     } catch (error) {
         console.error("[createAccount]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+async function changeAccountStatus(req, resp) {
+    try {
+        const { status } = req.params;
+        const VALID_STATUSES = ['ACTIVE', 'CLOSED', 'FROZEN'];
+
+        if (!VALID_STATUSES.includes(status)) {
+            return resp.status(400).json({ message: "Invalid status" });
+        }
+
+        const account = await accountModel.findOne({ user: req.user._id });
+
+        if (!account) {
+            return resp.status(404).json({ message: "Account not found" });
+        }
+
+        if (account.status === status) {
+            return resp.status(400).json({ message: `Account is already ${status}` });
+        }
+
+        account.status = status;
+        await account.save();
+
+        return resp.status(200).json({
+            message: "Account status changed successfully",
+            account
+        });
+
+    } catch (error) {
+        console.error("[changeAccountStatus]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
+async function changePin(req, resp) {
+    try {
+        const { oldPin, newPin } = req.body;
+        if (oldPin === newPin) {
+            return resp.status(400).json({ message: "Old and new pin cannot be same" });
+        }
+        const user = req.user;
+
+        // ✅ Fix 1: added const
+        const account = await accountModel.findOne({ user: user._id }).select('+pin');
+
+        if (!account) {
+            return resp.status(404).json({ message: "Account not found" });
+        }
+        console.log("account", account);
+        const oldPinMatch = await account.comparePin(oldPin);
+        console.log("oldPinMatch", oldPinMatch);
+
+        if (!oldPinMatch) {
+            return resp.status(400).json({ message: "Invalid old pin" });
+        }
+
+        account.pin = newPin;
+        await account.save();
+        console.log("account", account);
+        return resp.status(200).json({
+            message: "Pin Changed Successfully"
+        });
+
+    } catch (error) {
+        console.error("[changePin]", error);
         return resp.status(500).json({
             statusCode: 500,
             status: "failed",
@@ -80,4 +158,4 @@ async function getAccountBalance(req, resp) {
         return resp.status(500).json({ message: error.message });
     }
 }
-export default { createAccount, getAccount, getAccountBalance };
+export default { createAccount, getAccount, getAccountBalance, changeAccountStatus, changePin };

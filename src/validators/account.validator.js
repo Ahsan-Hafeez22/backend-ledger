@@ -19,4 +19,18 @@ export const createAccountDTO = z.object({
         .regex(/^\d+$/, 'Pin must contain only numbers')
 });
 
+
+export const changePinDTO = z.object({
+    oldPin: z
+        .string({ required_error: 'Pin is required' })
+        .length(4, 'Pin must be exactly 4 digits')
+        .regex(/^\d+$/, 'Pin must contain only numbers'),
+
+
+    newPin: z
+        .string({ required_error: 'Pin is required' })
+        .length(4, 'Pin must be exactly 4 digits')
+        .regex(/^\d+$/, 'Pin must contain only numbers')
+});
+
 export default createAccountDTO;
