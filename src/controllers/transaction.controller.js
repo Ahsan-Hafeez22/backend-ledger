@@ -6,149 +6,137 @@ import mongoose from "mongoose";
 import emailService from '../services/email.service.js';
 
 async function createTransaction(req, resp) {
+    const session = await mongoose.startSession();
     try {
-        const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
-        if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
-            return resp
-                .status(400)
-                .json({
-                    message:
-                        "FromAccount, ToAccount, amount, idempotencyKey are required",
-                });
+        const { toAccount, amount, idempotencyKey, description } = req.body;
+
+        // 1. Resolve fromAccount from token (logged in user)
+        const fromUserAccount = await accountModel.findOne({ user: req.user._id });
+        if (!fromUserAccount) {
+            return resp.status(404).json({ message: "Your account not found" });
         }
 
-        const fromUserAccount = await accountModel.findById(fromAccount);
-        const toUserAccount = await accountModel.findById(toAccount);
-        if (!fromUserAccount || !toUserAccount) {
-            return resp
-                .status(400)
-                .json({ message: "Invalid FromAccount or ToAccount" });
+        // 2. Resolve toAccount by accountNumber (user facing)
+        const toUserAccount = await accountModel.findOne({ accountNumber: toAccount });
+        if (!toUserAccount) {
+            return resp.status(400).json({ message: "Recipient account not found" });
         }
 
-        // 2. Validate Idempotency Key
-        const isTransactionAlreadyExsist = await transactionModel.findOne({
-            idempotencyKey,
-        });
-        if (isTransactionAlreadyExsist) {
-            if (isTransactionAlreadyExsist.status === "COMPLETED") {
+        // 3. Prevent sending to self
+        if (fromUserAccount._id.toString() === toUserAccount._id.toString()) {
+            return resp.status(400).json({ message: "Cannot send money to your own account" });
+        }
+
+        // 4. Validate idempotency key
+        const existingTransaction = await transactionModel.findOne({ idempotencyKey });
+        if (existingTransaction) {
+            if (existingTransaction.status === "COMPLETED") {
                 return resp.status(200).json({
-                    message: "Transaction already proceeded",
-                    transaction: isTransactionAlreadyExsist,
+                    message: "Transaction already completed",
+                    transaction: existingTransaction,
                 });
             }
-            if (isTransactionAlreadyExsist.status === "PENDING") {
-                return resp
-                    .status(200)
-                    .json({ message: "Transaction is still processing" });
+            if (existingTransaction.status === "PENDING") {
+                return resp.status(200).json({ message: "Transaction is still processing" });
             }
-            if (isTransactionAlreadyExsist.status === "FAILED") {
-                return resp
-                    .status(500)
-                    .json({ message: "Transaction processing Failed" });
+            if (existingTransaction.status === "FAILED") {
+                return resp.status(500).json({ message: "Transaction previously failed" });
             }
-
-            if (isTransactionAlreadyExsist.account === "REVERSED") {
-                return resp
-                    .status(200)
-                    .json({ message: "Transaction was reversed, please retry" });
+            if (existingTransaction.status === "REVERSED") {
+                return resp.status(400).json({ message: "Transaction was reversed" });
             }
         }
 
-        // 3. Validate FromAccount and ToAccount Status
-        if (
-            fromUserAccount.status !== "Active" ||
-            toUserAccount.status !== "Active"
-        ) {
-            return resp
-                .status(400)
-                .json({
-                    message:
-                        "Both from account and to account must be active to proceed transaction",
-                });
+        // 5. Validate both accounts are ACTIVE
+        if (fromUserAccount.status !== "ACTIVE") {
+            return resp.status(400).json({ message: "Your account is not active" });
+        }
+        if (toUserAccount.status !== "ACTIVE") {
+            return resp.status(400).json({ message: "Recipient account is not active" });
         }
 
-        // 4. Derive sender balance from ledger
+        // 6. Check sender balance
         const balance = await fromUserAccount.getBalance();
         if (balance < amount) {
-            return resp
-                .status(400)
-                .json({
-                    message: `Insufficient Balance.\nCurrent Balance: ${balance}\nReqested Amount: ${amount}`,
-                });
+            return resp.status(400).json({
+                message: `Insufficient balance. Available: ${balance}, Requested: ${amount}`
+            });
         }
 
-        // 5. create tranasaction
-        const session = await mongoose.startSession();
+        // 7. Run transaction atomically
         session.startTransaction();
 
-        const transaction = (await transactionModel.create(
+        const [transaction] = await transactionModel.create(
             [{
                 fromAccount: fromUserAccount._id,
-                toAccount: toAccount,
+                toAccount: toUserAccount._id,
                 amount,
                 idempotencyKey,
+                description: description || '',
                 status: "PENDING",
             }],
-            { session })
-        )[0];
-
-
-
-        const debitLedgetEntry = await ledgerModel.create(
-            [{
-                account: fromAccount,
-                type: "DEBIT",
-                amount,
-                transaction: transaction._id,
-            }],
-            { session },
-        );
-        await (() => {
-            return new Promise((resolve) => setTimeout(resolve, 2 * 1000));
-        })()
-
-        const creditLedgetEntry = await ledgerModel.create(
-            [{
-                account: toAccount,
-                type: "CREDIT",
-                amount,
-                transaction: transaction._id,
-            }],
-            { session },
+            { session }
         );
 
-        transaction.status = "COMPLETED";
+        await ledgerModel.create(
+            [
+                {
+                    account: fromUserAccount._id,
+                    type: "DEBIT",
+                    amount,
+                    transaction: transaction._id,
+                },
+                {
+                    account: toUserAccount._id,
+                    type: "CREDIT",
+                    amount,
+                    transaction: transaction._id,
+                }
+            ],
+            { session, ordered: true }
+        );
+
         await transactionModel.findOneAndUpdate(
             { _id: transaction._id },
             { status: "COMPLETED" },
             { session }
-
-        )
+        );
 
         await session.commitTransaction();
         session.endSession();
 
-        const toUser = await userModel.findById(toUserAccount.user);
-        console.log("user details", toUser);
-        emailService.sendTransactionEmail(req.user.email, req.user.name, amount, transaction._id, "CREDIT")
-            .catch(err => console.error('Error sending registration email:', err));
-        if (!toUser) {
-            console.log("Receiver user not found");
-        } else {
+        // 8. Send emails fire-and-forget
+        const toUser = await userModel.findById(toUserAccount.user).select('name email');
+
+        emailService.sendTransactionEmail(
+            req.user.email,
+            req.user.name,
+            amount,
+            transaction._id,
+            "DEBIT"
+        ).catch(err => console.error('Error sending sender email:', err));
+
+        if (toUser) {
             emailService.sendTransactionEmail(
                 toUser.email,
                 toUser.name,
                 amount,
                 transaction._id,
                 "CREDIT"
-            ).catch(err => console.error('Error sending email to receiver:', err));
+            ).catch(err => console.error('Error sending receiver email:', err));
         }
+
         return resp.status(201).json({
-            message: "Transaction Complete Successfully",
-            transaction: transaction
+            statusCode: 201,
+            status: "success",
+            message: "Transaction completed successfully",
+            transaction
         });
+
     } catch (error) {
-        console.log(error);
+        await session.abortTransaction();
+        session.endSession();
+        console.error("[createTransaction]", error);
         return resp.status(500).json({ message: "Internal Server Error" });
     }
 }
@@ -167,9 +155,9 @@ async function createInitialFundTransaction(req, resp) {
         }
 
         const toUserAccount = await accountModel.findOne({
-            _id: toAccount,
+            accountNumber: toAccount,
         })
-
+        console.log("To uSer account: ", toUserAccount);
         if (!toUserAccount) {
             return resp.status(400).json({
                 message: "Invalid toAccount"
@@ -193,7 +181,7 @@ async function createInitialFundTransaction(req, resp) {
         const transaction = await transactionModel.create(
             [{
                 fromAccount: fromUserAccount._id,
-                toAccount: toAccount,
+                toAccount: toUserAccount._id,
                 amount,
                 idempotencyKey,
                 status: "PENDING",
@@ -213,7 +201,7 @@ async function createInitialFundTransaction(req, resp) {
                     transaction: txn._id,
                 },
                 {
-                    account: toAccount,
+                    account: toUserAccount._id,
                     amount,
                     type: "CREDIT",
                     transaction: txn._id,
@@ -237,13 +225,147 @@ async function createInitialFundTransaction(req, resp) {
         await session.abortTransaction();
         session.endSession();
 
-        console.log(error);
 
+        console.error("[initialFund]", error);
         return resp.status(500).json({
-            message: "Internal Server Error",
-            error: error.message
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
         });
     }
 }
+async function getTransactionDetail(req, res) {
+    const { transactionId } = req.params;
+    try {
+        console.log("transactionId", transactionId);
+        const transaction = await transactionModel.findById(transactionId)
+            .populate({
+                path: 'fromAccount',
+                select: 'accountNumber accountTitle currency status',
+                populate: {
+                    path: 'user',
+                    select: 'name email'
+                }
+            })
+            .populate({
+                path: 'toAccount',
+                select: 'accountNumber accountTitle currency status',
+                populate: {
+                    path: 'user',
+                    select: 'name email'
+                }
+            });;
+        if (!transaction) {
+            return res.status(404).json({ message: "Transaction not found" });
+        }
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message:
+                "Transaction details fetched successfully",
+            transaction: transaction
+        });
+    } catch (error) {
+        console.error("[getTransactionDetail]", error);
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+async function getTransactions(req, res) {
+    const { page = 1, limit = 10, startDate, endDate } = req.query;
 
-export default { createTransaction, createInitialFundTransaction };
+    try {
+        const user = req.user;
+        const account = await accountModel.findOne({ user: user._id });
+        if (!account) {
+            return res.status(404).json({ message: "Account not found" });
+        }
+        console.log("Logged in user:", req.user._id);
+        console.log("Found account:", account?._id);
+        const filter = {
+            $or: [{ fromAccount: account._id }, { toAccount: account._id }]
+        }
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) filter.createdAt.$gte = new Date(startDate);
+            if (endDate) filter.createdAt.$gte = new Date(endDate);
+        }
+        const skip = (Number(page) - 1) * Number(limit);
+        const total = await transactionModel.countDocuments(filter);
+        const transactions = await transactionModel.find(filter)
+            .populate(
+                { path: 'fromAccount', select: 'accountNumber accountTitle', populate: { path: 'user', select: 'name email' } }
+            )
+            .populate(
+                { path: 'toAccount', select: 'accountNumber accountTitle', populate: { path: 'user', select: 'name email' } }
+            )
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit))
+            .lean();
+
+        const tagged = transactions.map(txn => ({
+            ...txn,
+            direction: txn.fromAccount._id.toString() === account._id.toString()
+                ? 'DEBIT'
+                : 'CREDIT'
+        }));
+
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Transactions fetched successfully",
+            data: {
+                transactions: tagged,
+                pagination: {
+                    total,
+                    page: Number(page),
+                    limit: Number(limit),
+                    totalPages: Math.ceil(total / Number(limit)),
+                    hasNextPage: Number(page) < Math.ceil(total / Number(limit)),
+                }
+            }
+        });
+    } catch (error) {
+        console.error("[getTransactions]", error);
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+
+}
+
+async function getTransactionByIdempotencyKey(req, resp) {
+    try {
+        const { idempotencyKey } = req.query;
+
+        const transaction = await transactionModel
+            .findOne({ idempotencyKey })
+            .populate('fromAccount', 'accountNumber')
+            .populate('toAccount', 'accountNumber');
+
+        if (!transaction) {
+            return resp.status(404).json({ message: "Transaction not found" });
+        }
+
+        return resp.status(200).json({
+            statusCode: 200,
+            status: "success",
+            data: {
+                transactionId: transaction._id,
+                status: transaction.status,  // PENDING, COMPLETED, FAILED, REVERSED
+                amount: transaction.amount,
+                createdAt: transaction.createdAt
+            }
+        });
+
+    } catch (error) {
+        return resp.status(500).json({ message: "Internal Server Error" });
+    }
+}
+export default { createTransaction, createInitialFundTransaction, getTransactionDetail, getTransactions, getTransactionByIdempotencyKey };

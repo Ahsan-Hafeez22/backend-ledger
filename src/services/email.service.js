@@ -88,11 +88,7 @@ export const sendTransactionEmail = async (userEmail, userName, amount, transact
                 <strong>Amount:</strong> ${amount}<br>
                 <strong>Transaction ID:</strong> ${transactionId}
             </p>
-            <div style="margin: 25px 0;">
-                <a href="#" style="display: inline-block; padding: 12px 24px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 600;">
-                    View Transaction
-                </a>
-            </div>
+            
             <p style="color: #777; font-size: 13px;">
                 If you have any questions, feel free to reach out to our support team.
             </p>

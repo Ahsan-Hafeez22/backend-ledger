@@ -31,6 +31,11 @@ const transactionSchema = mongoose.Schema({
         required: [true, "Transaction must have an idempotency key"],
         unique: true,
         index: true,
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: 200,
     }
 
 }

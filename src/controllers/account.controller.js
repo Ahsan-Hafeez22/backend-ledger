@@ -138,13 +138,13 @@ async function getAccount(req, resp) {
 async function getAccountBalance(req, resp) {
     try {
 
-        const accountId = req.params.accountId;
-        console.log("account ID", accountId);
+        const accountNumber = req.params.accountNumber;
+        console.log("account number", accountNumber);
 
         const user = req.user;
         console.log("user", user);
         const isAccountExsist = await accountModel.findOne({
-            _id: accountId,
+            accountNumber: accountNumber,
             user: user._id
         });
         console.log('isAccountExsist', isAccountExsist)
@@ -153,9 +153,14 @@ async function getAccountBalance(req, resp) {
         }
         const balance = await isAccountExsist.getBalance();
         console.log("balance", balance);
-        resp.status(200).json({ accountId: accountId, balance: balance });
+        resp.status(200).json({ accountNumber, balance: balance });
     } catch (error) {
-        return resp.status(500).json({ message: error.message });
+        console.error("[Initial Trasaction]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
     }
 }
 export default { createAccount, getAccount, getAccountBalance, changeAccountStatus, changePin };
