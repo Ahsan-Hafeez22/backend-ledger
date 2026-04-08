@@ -73,3 +73,13 @@ export const transactionIdDTO = z.object({
         .string({ required_error: 'transactionId is required' })
         .regex(/^[a-fA-F0-9]{24}$/, 'transactionId must be a valid MongoDB ObjectId'),
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /transactions/verify-pin
+// ─────────────────────────────────────────────────────────────────────────────
+export const verifyPinDTO = z.object({
+    pin: z
+        .string({ required_error: 'Pin is required' })
+        .length(4, 'Pin must be exactly 4 digits')
+        .regex(/^\d+$/, 'Pin must contain only numbers')
+});

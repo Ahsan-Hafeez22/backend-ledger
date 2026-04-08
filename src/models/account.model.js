@@ -48,6 +48,16 @@ const accountSchema = new mongoose.Schema(
             },
             default: "ACTIVE",
         },
+        pinAttempt: {
+            type: Number,
+            default: 0,
+            select: false
+        },
+        pinLockedUntil: {
+            type: Date,
+            default: null,
+            select: false
+        }
     },
     {
         timestamps: true,

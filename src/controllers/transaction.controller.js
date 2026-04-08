@@ -365,7 +365,79 @@ async function getTransactionByIdempotencyKey(req, resp) {
         });
 
     } catch (error) {
-        return resp.status(500).json({ message: "Internal Server Error" });
+        console.error("[getTransactionByIdempotencyKey]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
     }
 }
-export default { createTransaction, createInitialFundTransaction, getTransactionDetail, getTransactions, getTransactionByIdempotencyKey };
+async function verifyPin(req, resp) {
+    try {
+        const { pin } = req.body;
+        const user = req.user;
+
+        const account = await accountModel.findOne({ user: user._id })
+            .select('+pin +pinAttempt +pinLockedUntil');
+        if (!account) {
+            return resp.status(404).json({ message: "Account not found" });
+        }
+        if (account.pinLockedUntil && account.pinLockedUntil > new Date()) {
+            const minutesLeft = Math.ceil(
+                (account.pinLockedUntil - new Date()) / 1000 / 60
+            );
+            return resp.status(403).json({
+                message: `Account locked. Try again in ${minutesLeft} minute(s).`,
+                lockedUntil: account.pinLockedUntil,
+            });
+        }
+
+        const pinMatch = await account.comparePin(pin);
+        if (pinMatch) {
+            account.pinAttempt = 0;
+            account.pinLockedUntil = null;
+            await account.save();
+
+            return resp.status(200).json({
+                statusCode: 200,
+                status: "success",
+                message: "PIN verified successfully",
+            });
+
+
+        } else {
+            account.pinAttempt += 1;
+
+            if (account.pinAttempt >= 3) {
+                account.status = 'FROZEN';
+                account.pinLockedUntil = new Date(Date.now() + 60 * 60 * 1000);
+                account.pinAttempt = 0;
+                await account.save();
+
+                return resp.status(403).json({
+                    message: "Too many failed attempts. Account frozen for 1 hour.",
+                    lockedUntil: account.pinLockedUntil,
+                });
+            }
+
+            await account.save();
+
+            return resp.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: `Incorrect PIN. ${3 - account.pinAttempt} attempt(s) remaining.`,
+                attemptsLeft: 3 - account.pinAttempt,
+            });
+        }
+    } catch (error) {
+        console.error("[verifyPin]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+
+    }
+}
+export default { createTransaction, createInitialFundTransaction, getTransactionDetail, getTransactions, getTransactionByIdempotencyKey, verifyPin };

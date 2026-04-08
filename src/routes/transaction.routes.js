@@ -6,6 +6,7 @@ import {
     getTransactionsDTO,
     checkTransactionStatusDTO,
     transactionIdDTO,
+    verifyPinDTO,
 } from "../validators/transaction.validator.js";
 import { validate } from "../middlewares/validation.middleware.js";
 
@@ -26,12 +27,12 @@ router.post(
     transactionController.createTransaction
 );
 
-// router.get(
-//     '/transactions',
-//     authMiddleware.authMiddleware,
-//     validate(getTransactionsDTO, 'query'),
-//     transactionController.getTransactions
-// );
+router.post(
+    '/verify-pin',
+    authMiddleware.authMiddleware,
+    validate(verifyPinDTO, 'body'),
+    transactionController.verifyPin
+)
 router.get('/transactions',
     authMiddleware.authMiddleware,
     validate(getTransactionsDTO, 'query'),
@@ -64,3 +65,5 @@ router.get('/transactions', authMiddleware.authMiddleware, transactionController
 router.get('/check-status', authMiddleware.authMiddleware, transactionController.getTransactionByIdempotencyKey);
 
 */
+
+// Pin verificaton added  if the user add 3 wrong pin the account will be FROZEN for one hour.
