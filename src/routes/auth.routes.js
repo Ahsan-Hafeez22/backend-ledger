@@ -13,6 +13,7 @@ import {
     verifyResetOtpDto,
     resetPasswordDto,
     changePasswordDto,
+    registerDeviceDto
 } from "../validators/auth.validator.js";
 import { otpLimiter, sensitiveLimiter } from "../middlewares/rateLimiter.js";
 
@@ -28,7 +29,9 @@ router.post("/verify-reset-otp", validate(verifyResetOtpDto), otpLimiter, authCo
 router.post("/reset-password", validate(resetPasswordDto), sensitiveLimiter, authController.resetPassword);
 router.post("/change-password", authMiddleware.authMiddleware, validate(changePasswordDto), sensitiveLimiter, authController.changePassword);
 router.post("/google-auth", sensitiveLimiter, authController.googleAuth);
-router.delete("/delete-user", sensitiveLimiter, authController.deleteAccount)
+router.delete("/delete-user", sensitiveLimiter, authController.deleteAccount);
+router.delete("/auth-routes", sensitiveLimiter, validate(resetPasswordDto), authMiddleware.authMiddleware, authController.registerDevice);
+
 // router.post("/logout-all")
 // router.post("/update-profile")
 export default router;

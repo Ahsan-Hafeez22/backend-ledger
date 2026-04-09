@@ -192,6 +192,36 @@ export const resetPasswordDto = z.object({
     password: passwordField,
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/register-device
+// What we expect: the fcmToken, deviceId, deviceType, deviceName
+// ─────────────────────────────────────────────────────────────────────────────
+import { z } from 'zod';
+
+export const registerDeviceDto = z.object({
+    fcmToken: z
+        .string({ required_error: 'FCM token is required' })
+        .min(10, 'Invalid FCM token')
+        .trim(),
+
+    deviceId: z
+        .string({ required_error: 'Device ID is required' })
+        .min(3, 'Invalid device ID')
+        .trim(),
+
+    deviceType: z
+        .enum(['A', 'I', 'W'], {
+            errorMap: () => ({ message: 'Invalid device type' }),
+        })
+        .optional(),
+
+    deviceName: z
+        .string()
+        .max(100, 'Device name too long')
+        .trim()
+        .optional(),
+
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/change-password

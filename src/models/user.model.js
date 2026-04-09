@@ -1,6 +1,32 @@
 import mongoose from "mongoose";
 import bcrypt from 'bcrypt';
 
+
+// src/models/User.js
+const fcmTokenSchema = new mongoose.Schema(
+    {
+        token: { type: String, required: true },
+        deviceId: { type: String, required: true },  // stable hardware/app ID
+        deviceType: { type: String, enum: ['android', 'ios', 'web'], default: 'android' },
+        deviceName: { type: String, default: 'unknown' }, // "Samsung S24", "iPhone 15"
+        isActive: { type: Boolean, default: true },   // false = logged out / invalid token
+        invalidAt: { type: Date, default: null },       // when FCM marked it invalid
+        lastUsed: { type: Date, default: Date.now },
+        createdAt: { type: Date, default: Date.now },
+
+        // Optional: notification preferences per device
+        notificationsEnabled: { type: Boolean, default: true },
+    },
+    { _id: false }
+);
+const notificationPrefsSchema = new mongoose.Schema(
+    {
+        transactional: { type: Boolean, default: true },  // money sent/received
+        marketing: { type: Boolean, default: true },  // promotions
+        security: { type: Boolean, default: true },  // account frozen/suspended
+    },
+    { _id: false }
+);
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -23,6 +49,25 @@ const userSchema = new mongoose.Schema({
         select: false
     },
 
+    fcmTokens: {
+        type: [fcmTokenSchema],
+        default: [],
+        validate: {
+            validator: (arr) => arr.length <= 10,
+            message: 'Maximum 10 devices allowed per user.',
+        },
+    },
+
+    notificationPrefs: {
+        type: notificationPrefsSchema,
+        default: () => ({}),
+    },
+
+    accountStatus: {
+        type: String,
+        enum: ['active', 'frozen', 'suspended', 'closed'],
+        default: 'active',
+    },
     // ────── Important Fields for Ledger App ──────
 
     phone: {
@@ -93,11 +138,13 @@ const userSchema = new mongoose.Schema({
         default: false,
         immutable: true,
         select: false
-    }
+    },
 
 }, {
     timestamps: true
 });
+userSchema.index({ '_id': 1, 'fcmTokens.deviceId': 1 });
+userSchema.index({ 'fcmTokens.token': 1 });
 
 // Password hashing middleware
 userSchema.pre("save", async function () {

@@ -430,6 +430,25 @@ async function login(req, res) {
             });
         }
 
+        // if (fcmToken) {
+        //     const alreadyExists = await User.findOne({
+        //         _id: user._id,
+        //         'fcmTokens.token': token,
+        //     });
+        //     if (alreadyExists) {
+        //         await userModel.updateOne(
+        //             { _id: user._id, 'fcmTokens.token': fcmToken },
+        //             { $set: { 'fcmTokens.$.lastUsed': new Date() } }
+        //         );
+        //     }
+        //     if (user.fcmTokens.length >= 10) {
+        //         // Remove oldest token to stay under cap
+        //         user.fcmTokens.sort((a, b) => a.lastUsed - b.lastUsed);
+        //         user.fcmTokens.shift();
+        //     }
+        //     user.fcmTokens.push({ fcmToken, deviceType, createdAt: new Date(), lastUsed: new Date() });
+        //     await user.save();
+        // }
         const accessToken = authUtils.generateAccessToken(user);
         const refreshToken = authUtils.generateRefreshToken(user);
 
@@ -945,6 +964,84 @@ async function deleteAccount(req, res) {
     }
 }
 
+async function registerDevice(req, res) {
+    try {
+        const { fcmToken, deviceId, deviceType = 'android', deviceName = 'unknown' } = req.body;
+        const userId = req.user._id;
+
+
+        // ── STEP 1: Try to update existing device (by deviceId) ──
+        const updated = await userModel.findOneAndUpdate(
+            {
+                _id: userId,
+                'fcmTokens.deviceId': deviceId
+            },
+            {
+                $set: {
+                    'fcmTokens.$.token': fcmToken,
+                    'fcmTokens.$.deviceType': deviceType,
+                    'fcmTokens.$.deviceName': deviceName,
+                    'fcmTokens.$.lastUsed': new Date()
+                }
+            },
+            { new: true } // return the updated document
+        );
+
+        if (updated) {
+            // Device existed and was updated
+            return res.status(200).json({
+                statusCode: 200,
+                status: "success",
+                message: "Device updated successfully"
+            });
+        }
+
+        // ── STEP 2: Device doesn't exist → add new one (if under limit) ──
+        const user = await userModel.findById(userId).select('fcmTokens');
+
+        // Enforce max 10 devices: remove oldest if at limit
+        if (user?.fcmTokens?.length >= 10) {
+            // Find the oldest entry by lastUsed
+            const oldest = [...user.fcmTokens]
+                .sort((a, b) => new Date(a.lastUsed) - new Date(b.lastUsed))[0];
+
+            if (oldest?.deviceId) {
+                await userModel.findByIdAndUpdate(userId, {
+                    $pull: { fcmTokens: { deviceId: oldest.deviceId } }
+                });
+            }
+        }
+
+        // Add the new device entry
+        await userModel.findByIdAndUpdate(userId, {
+            $push: {
+                fcmTokens: {
+                    token: fcmToken,
+                    deviceId: deviceId,
+                    deviceType: deviceType,
+                    deviceName: deviceName,
+                    createdAt: new Date(),
+                    lastUsed: new Date()
+                }
+            }
+        });
+
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Device registered successfully"
+        });
+
+    } catch (error) {
+        console.error("[registerDevice]", error);
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error"
+        });
+    }
+}
+
 
 export default {
     currentUser,
@@ -959,5 +1056,6 @@ export default {
     resetPassword,
     changePassword,
     googleAuth,
-    deleteAccount
+    deleteAccount,
+    registerDevice
 };
