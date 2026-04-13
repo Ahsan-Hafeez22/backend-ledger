@@ -56,6 +56,7 @@ const userSchema = new mongoose.Schema({
             validator: (arr) => arr.length <= 10,
             message: 'Maximum 10 devices allowed per user.',
         },
+        select: false
     },
 
     notificationPrefs: {

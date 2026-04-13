@@ -3,6 +3,7 @@ import accountModel from "../models/account.model.js";
 import userModel from "../models/user.model.js";
 import ledgerModel from "../models/ledger.model.js";
 import mongoose from "mongoose";
+import { onMoneySent } from './notification.controller.js';
 import emailService from '../services/email.service.js';
 
 async function createTransaction(req, resp) {
@@ -107,7 +108,7 @@ async function createTransaction(req, resp) {
 
         // 8. Send emails fire-and-forget
         const toUser = await userModel.findById(toUserAccount.user).select('name email');
-
+        onMoneySent(transaction);
         emailService.sendTransactionEmail(
             req.user.email,
             req.user.name,

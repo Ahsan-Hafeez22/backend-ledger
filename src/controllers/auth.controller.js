@@ -1,3 +1,4 @@
+// import logger from 'logger';
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -402,8 +403,6 @@ async function resendOtp(req, res) {
 async function login(req, res) {
     try {
         const { email, password } = req.body;
-
-
         const user = await userModel.findOne({ email }).select("+password");
         if (!user) {
             return res.status(401).json({
@@ -429,26 +428,6 @@ async function login(req, res) {
                 message: "Invalid credentials: Password",
             });
         }
-
-        // if (fcmToken) {
-        //     const alreadyExists = await User.findOne({
-        //         _id: user._id,
-        //         'fcmTokens.token': token,
-        //     });
-        //     if (alreadyExists) {
-        //         await userModel.updateOne(
-        //             { _id: user._id, 'fcmTokens.token': fcmToken },
-        //             { $set: { 'fcmTokens.$.lastUsed': new Date() } }
-        //         );
-        //     }
-        //     if (user.fcmTokens.length >= 10) {
-        //         // Remove oldest token to stay under cap
-        //         user.fcmTokens.sort((a, b) => a.lastUsed - b.lastUsed);
-        //         user.fcmTokens.shift();
-        //     }
-        //     user.fcmTokens.push({ fcmToken, deviceType, createdAt: new Date(), lastUsed: new Date() });
-        //     await user.save();
-        // }
         const accessToken = authUtils.generateAccessToken(user);
         const refreshToken = authUtils.generateRefreshToken(user);
 
@@ -475,6 +454,180 @@ async function login(req, res) {
         });
     }
 }
+
+// ─────────────────────────────────────────────────────────────
+// POST /auth/register-device
+// Body: { fcmToken, deviceId, deviceType, deviceName }
+// ─────────────────────────────────────────────────────────────
+
+
+const MAX_DEVICES = 10;
+
+export const registerDevice = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { fcmToken, deviceId, deviceType = "android", deviceName = "unknown" } = req.body;
+        const userId = req.user?._id;
+
+        // ── 2. Remove duplicate FCM token (edge case handling) ──
+        await userModel.updateOne(
+            { _id: userId },
+            {
+                $pull: {
+                    fcmTokens: { token: fcmToken }
+                }
+            },
+            { session }
+        );
+
+        // ── 3. Try updating existing device ──
+        const updateResult = await userModel.updateOne(
+            {
+                _id: userId,
+                "fcmTokens.deviceId": deviceId
+            },
+            {
+                $set: {
+                    "fcmTokens.$.token": fcmToken,
+                    "fcmTokens.$.deviceType": deviceType,
+                    "fcmTokens.$.deviceName": deviceName,
+                    "fcmTokens.$.lastUsed": new Date(),
+                    "fcmTokens.$.isActive": true,
+                    "fcmTokens.$.invalidAt": null
+                }
+            },
+            { session }
+        );
+
+        // ── 4. If device exists → done ──
+        if (updateResult.modifiedCount > 0) {
+            await session.commitTransaction();
+            session.endSession();
+
+            return res.status(200).json({
+                status: "success",
+                message: "Device updated successfully",
+            });
+        }
+
+        // ── 5. Fetch fresh user devices ──
+        const user = await userModel.findById(userId).select("fcmTokens").session(session);
+
+        // ── 6. Enforce max device limit ──
+        if (user.fcmTokens.length >= MAX_DEVICES) {
+            const oldestDevice = user.fcmTokens.sort(
+                (a, b) => new Date(a.lastUsed) - new Date(b.lastUsed)
+            )[0];
+
+            if (oldestDevice?.deviceId) {
+                await userModel.updateOne(
+                    { _id: userId },
+                    {
+                        $pull: {
+                            fcmTokens: { deviceId: oldestDevice.deviceId }
+                        }
+                    },
+                    { session }
+                );
+            }
+        }
+
+        // ── 7. Add new device ──
+        await userModel.updateOne(
+            { _id: userId },
+            {
+                $push: {
+                    fcmTokens: {
+                        token: fcmToken,
+                        deviceId,
+                        deviceType,
+                        deviceName,
+                        isActive: true,
+                        createdAt: new Date(),
+                        lastUsed: new Date(),
+                        invalidAt: null,
+                        notificationsEnabled: true
+                    }
+                }
+            },
+            { session }
+        );
+
+        // ── 8. Commit transaction ──
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Device registered successfully",
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error("[registerDevice]", error);
+
+        return res.status(500).json({
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Get Registered Devices
+// Return all the device name and and their Ids.
+// ─────────────────────────────────────────────────────────────
+
+async function getUserDevices(req, res) {
+    try {
+        const user = await userModel.findById(req.user._id).select('+fcmTokens');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        const devices = user.fcmTokens.map(({ deviceId, deviceType, deviceName, isActive, lastUsed, createdAt }) => ({
+            deviceId,
+            deviceType,
+            deviceName,
+            isActive,
+            lastUsed,
+            createdAt,
+        }));
+
+        res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Devices Fetched Successfully",
+            devices: devices
+        });
+    } catch (err) {
+        console.error('[Device] Get devices error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// ── DELETE /devices/:deviceId ─────────────────────────────────────────────────
+// Manually remove a specific device (e.g. from a "manage devices" screen)
+export const removeDevice = async (req, res) => {
+    const { deviceId } = req.params;
+    const { userId } = req.user;
+
+    try {
+        await User.findByIdAndUpdate(userId, {
+            $pull: { fcmTokens: { deviceId } },
+        });
+
+        logger.info(`[Device] Manually removed device ${deviceId} for user ${userId}`);
+        res.json({ message: 'Device removed' });
+    } catch (err) {
+        logger.error('[Device] Remove device error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /auth/user
@@ -964,76 +1117,23 @@ async function deleteAccount(req, res) {
     }
 }
 
-async function registerDevice(req, res) {
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/logout-all-devices
+// Body: User get logs out from all the devices
+// Logout all the account and makes the FCM token list empty
+// ─────────────────────────────────────────────────────────────────────────────
+async function logoutAllDevices(req, res) {
+    const { userId } = req.user;
     try {
-        const { fcmToken, deviceId, deviceType = 'android', deviceName = 'unknown' } = req.body;
-        const userId = req.user._id;
+        await userModel.findByIdAndUpdate(userId, { $set: { fcmTokens: [] } });
+        logger.info(`[Auth] All devices logged out for user ${userId}`);
+        await tokenBlackList.create({ token });
+        return res.json({ message: 'Logged out from all devices' });
 
-
-        // ── STEP 1: Try to update existing device (by deviceId) ──
-        const updated = await userModel.findOneAndUpdate(
-            {
-                _id: userId,
-                'fcmTokens.deviceId': deviceId
-            },
-            {
-                $set: {
-                    'fcmTokens.$.token': fcmToken,
-                    'fcmTokens.$.deviceType': deviceType,
-                    'fcmTokens.$.deviceName': deviceName,
-                    'fcmTokens.$.lastUsed': new Date()
-                }
-            },
-            { new: true } // return the updated document
-        );
-
-        if (updated) {
-            // Device existed and was updated
-            return res.status(200).json({
-                statusCode: 200,
-                status: "success",
-                message: "Device updated successfully"
-            });
-        }
-
-        // ── STEP 2: Device doesn't exist → add new one (if under limit) ──
-        const user = await userModel.findById(userId).select('fcmTokens');
-
-        // Enforce max 10 devices: remove oldest if at limit
-        if (user?.fcmTokens?.length >= 10) {
-            // Find the oldest entry by lastUsed
-            const oldest = [...user.fcmTokens]
-                .sort((a, b) => new Date(a.lastUsed) - new Date(b.lastUsed))[0];
-
-            if (oldest?.deviceId) {
-                await userModel.findByIdAndUpdate(userId, {
-                    $pull: { fcmTokens: { deviceId: oldest.deviceId } }
-                });
-            }
-        }
-
-        // Add the new device entry
-        await userModel.findByIdAndUpdate(userId, {
-            $push: {
-                fcmTokens: {
-                    token: fcmToken,
-                    deviceId: deviceId,
-                    deviceType: deviceType,
-                    deviceName: deviceName,
-                    createdAt: new Date(),
-                    lastUsed: new Date()
-                }
-            }
-        });
-
-        return res.status(200).json({
-            statusCode: 200,
-            status: "success",
-            message: "Device registered successfully"
-        });
-
-    } catch (error) {
-        console.error("[registerDevice]", error);
+    } catch (err) {
+        logger.error('[Auth] Logout-all error:', err);
         return res.status(500).json({
             statusCode: 500,
             status: "failed",
@@ -1043,11 +1143,13 @@ async function registerDevice(req, res) {
 }
 
 
+
 export default {
     currentUser,
     register,
     login,
     logout,
+    logoutAllDevices,
     refreshToken,
     verifyOtp,
     resendOtp,
@@ -1057,5 +1159,6 @@ export default {
     changePassword,
     googleAuth,
     deleteAccount,
-    registerDevice
+    registerDevice,
+    getUserDevices
 };

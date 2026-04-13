@@ -23,6 +23,7 @@ router.post("/verify-otp", validate(verifyOtpDto), otpLimiter, authController.ve
 router.post("/resend-otp", validate(resendOtpDto), otpLimiter, authController.resendOtp);
 router.post("/login", validate(loginDto), authController.login);
 router.post("/logout", authMiddleware.authMiddleware, authController.logout);
+router.post("/logout-all-devices", authMiddleware.authMiddleware, authController.logoutAllDevices);
 router.post("/refresh-token", validate(refreshTokenDto), authController.refreshToken);
 router.post("/forgot-password", validate(forgotPasswordDto), sensitiveLimiter, authController.forgotPassword);
 router.post("/verify-reset-otp", validate(verifyResetOtpDto), otpLimiter, authController.verifyResetOtp);
@@ -30,7 +31,8 @@ router.post("/reset-password", validate(resetPasswordDto), sensitiveLimiter, aut
 router.post("/change-password", authMiddleware.authMiddleware, validate(changePasswordDto), sensitiveLimiter, authController.changePassword);
 router.post("/google-auth", sensitiveLimiter, authController.googleAuth);
 router.delete("/delete-user", sensitiveLimiter, authController.deleteAccount);
-router.delete("/auth-routes", sensitiveLimiter, validate(resetPasswordDto), authMiddleware.authMiddleware, authController.registerDevice);
+router.post("/register-device", sensitiveLimiter, validate(registerDeviceDto), authMiddleware.authMiddleware, authController.registerDevice);
+router.get("/get-registered-device", sensitiveLimiter, authMiddleware.authMiddleware, authController.getUserDevices);
 
 // router.post("/logout-all")
 // router.post("/update-profile")

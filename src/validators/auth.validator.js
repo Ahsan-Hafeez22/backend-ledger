@@ -196,7 +196,6 @@ export const resetPasswordDto = z.object({
 // POST /auth/register-device
 // What we expect: the fcmToken, deviceId, deviceType, deviceName
 // ─────────────────────────────────────────────────────────────────────────────
-import { z } from 'zod';
 
 export const registerDeviceDto = z.object({
     fcmToken: z
