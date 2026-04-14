@@ -1,6 +1,6 @@
 import { getMessaging } from "../config/firebase.config.js";
 import userModel from "../models/user.model.js";
-import logger from "logger";
+import logger from "../utils/logger.js";
 
 const PERMANENT_FAILURE_CODES = new Set([
     'messaging/invalid-registration-token',
@@ -15,6 +15,13 @@ const TEMPORARY_FAILURE_CODES = new Set([
 ]);
 
 class NotificationService {
+    static #stringifyData(data) {
+        const safe = data && typeof data === 'object' ? data : {};
+        return Object.fromEntries(
+            Object.entries(safe).map(([k, v]) => [String(k), v == null ? '' : String(v)])
+        );
+    }
+
     static #buildMessage(tokens, { title, body, imageUrl, data = {} }) {
         return {
             tokens,
@@ -24,9 +31,7 @@ class NotificationService {
                 ...(imageUrl && { imageUrl }),
             },
             data: {
-                ...Object.fromEntries(
-                    Object.entries(data).map(([k, v]) => [k.toString(), v.toString()]) // ✅ fixed typo
-                )
+                ...this.#stringifyData(data),
             },
             android: {
                 priority: 'high',
@@ -94,6 +99,10 @@ class NotificationService {
             logger.warn(`[FCM] User ${userId} not found`);
             return;
         }
+        if (notifType.includes('TRANSACTIONAL') && user.notificationPrefs?.transactional === false) {
+            logger.info(`[FCM] Skipped — user ${userId} has transactional notifications disabled`);
+            return;
+        }
         if (notifType.includes('MARKETING') && !user.notificationPrefs.marketing) {
             logger.info(`[FCM] Skipped — user ${userId} has marketing notifications disabled`);
             return;
@@ -128,7 +137,7 @@ class NotificationService {
         return result;
     }
 
-    static async sendToUsers(userIds, payload) {
+    static async sendToUsers(userIds, payload, notifType = '') {
         const users = await userModel.find(
             { _id: { $in: userIds } },
             { fcmTokens: 1, notificationPrefs: 1 }
@@ -138,6 +147,10 @@ class NotificationService {
         const tokenToUserMap = new Map();
 
         users.forEach((user) => {
+            if (notifType.includes('TRANSACTIONAL') && user.notificationPrefs?.transactional === false) return;
+            if (notifType.includes('MARKETING') && user.notificationPrefs?.marketing === false) return;
+            if (notifType.includes('ACCOUNT') && user.notificationPrefs?.security === false) return;
+
             user.fcmTokens
                 .filter((t) => t.isActive && t.notificationsEnabled)
                 .forEach(({ token }) => {
@@ -191,7 +204,7 @@ class NotificationService {
             topic,
             notification: { title, body, ...(imageUrl && { imageUrl }) },
             data: {
-                ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+                ...this.#stringifyData(data),
                 sentAt: new Date().toISOString(),
             },
         };

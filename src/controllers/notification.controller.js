@@ -5,22 +5,36 @@ import userModel from '../models/user.model.js';
 import logger from '../utils/logger.js';
 
 // Called internally from your transaction service — not an HTTP route
-export const onMoneySent = async (transaction) => {
+export const onMoneySent = async ({
+    senderUserId,
+    recipientUserId,
+    senderName,
+    recipientName,
+    amount,
+    currency,
+    transactionId,
+}) => {
     try {
         await NotificationService.sendToUser(
-            transaction.senderId,
+            senderUserId,
             Payloads.moneySent({
-                amount: transaction.amount, currency: transaction.currency,
-                recipientName: transaction.recipientName, transactionId: transaction._id,
-            })
+                amount,
+                currency,
+                recipientName,
+                transactionId,
+            }),
+            'TRANSACTIONAL_MONEY_SENT'
         );
 
         await NotificationService.sendToUser(
-            transaction.recipientId,
+            recipientUserId,
             Payloads.moneyReceived({
-                amount: transaction.amount, currency: transaction.currency,
-                senderName: transaction.senderName, transactionId: transaction._id,
-            })
+                amount,
+                currency,
+                senderName,
+                transactionId,
+            }),
+            'TRANSACTIONAL_MONEY_RECEIVED'
         );
     } catch (err) {
         logger.error('[Notification] onMoneySent error:', err);

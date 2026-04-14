@@ -108,7 +108,15 @@ async function createTransaction(req, resp) {
 
         // 8. Send emails fire-and-forget
         const toUser = await userModel.findById(toUserAccount.user).select('name email');
-        onMoneySent(transaction);
+        onMoneySent({
+            senderUserId: req.user._id,
+            recipientUserId: toUserAccount.user,
+            senderName: req.user.name,
+            recipientName: toUser?.name ?? 'Recipient',
+            amount,
+            currency: fromUserAccount.currency,
+            transactionId: transaction._id,
+        });
         emailService.sendTransactionEmail(
             req.user.email,
             req.user.name,
