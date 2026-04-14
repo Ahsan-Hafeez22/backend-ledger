@@ -49,13 +49,22 @@ class NotificationService {
     }
 
     static async sendToTokens(tokens, payload) {
-        if (!tokens?.length) return { successCount: 0, failureCount: 0, invalidTokens: [], tempFailedTokens: [] };
+        if (!tokens?.length) {
+            return {
+                successCount: 0,
+                failureCount: 0,
+                invalidTokens: [],
+                tempFailedTokens: [],
+                errors: [],
+            };
+        }
 
         const BATCH_SIZE = 500;
         let successCount = 0;
         let failureCount = 0;
         const invalidTokens = [];
         const tempFailedTokens = [];
+        const errors = [];
 
         for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
             const batch = tokens.slice(i, i + BATCH_SIZE);
@@ -71,9 +80,11 @@ class NotificationService {
                     if (res.success) return;
 
                     const code = res.error?.code;
+                    const message = res.error?.message;
                     const token = batch[idx];
 
                     logger.warn(`[FCM] Delivery failed — code: ${code}, token: ${token.slice(0, 20)}...`);
+                    errors.push({ token, code, message });
 
                     if (PERMANENT_FAILURE_CODES.has(code)) {
                         invalidTokens.push(token);
@@ -85,11 +96,14 @@ class NotificationService {
             } catch (err) {
                 logger.error('[FCM] Batch send error:', err);
                 failureCount += batch.length;
+                batch.forEach((token) => {
+                    errors.push({ token, code: 'BATCH_ERROR', message: err?.message ?? String(err) });
+                });
             }
         }
 
         logger.info(`[FCM] Result — success: ${successCount}, failure: ${failureCount}, invalid: ${invalidTokens.length}, temp-failed: ${tempFailedTokens.length}`);
-        return { successCount, failureCount, invalidTokens, tempFailedTokens };
+        return { successCount, failureCount, invalidTokens, tempFailedTokens, errors };
     }
 
     static async sendToUser(userId, payload, notifType = '') {

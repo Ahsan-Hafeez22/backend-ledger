@@ -1,9 +1,8 @@
 // src/services/notificationPayloads.js
 
 export const Payloads = {
-
     moneySent: ({ amount, currency = 'PKR', recipientName, transactionId }) => ({
-        title: 'Money Sent ✅',
+        title: 'Money Sent',
         body: `You sent ${currency} ${amount} to ${recipientName}`,
         data: { type: 'MONEY_SENT', transactionId: String(transactionId), amount: String(amount), currency, screen: 'TransactionDetailScreen' },
     }),
@@ -26,14 +25,20 @@ export const Payloads = {
         data: { type: 'ACCOUNT_SUSPENDED', untilDate: String(untilDate), screen: 'AccountStatusScreen' },
     }),
 
+    accountCreationSuccess: ({ accountNumber }) => ({
+        title: '🎉 Account Created Successfully',
+        body: `Your account (${accountNumber}) has been successfully created. You can now start transactions.`,  // ✅ typo fixed
+        data: { type: 'ACCOUNT_CREATION_SUCCESS', screen: 'AccountScreen' },
+    }),
+
     transactionSuccess: ({ transactionId, amount, currency = 'PKR' }) => ({
-        title: 'Transaction Successful ✅',
+        title: 'Transaction Successful',
         body: `Your transaction of ${currency} ${amount} was completed.`,
         data: { type: 'TRANSACTION_SUCCESS', transactionId: String(transactionId), screen: 'TransactionDetailScreen' },
     }),
 
     transactionFailed: ({ transactionId, reason = 'insufficient funds' }) => ({
-        title: 'Transaction Failed ❌',
+        title: 'Transaction Failed',
         body: `Your transaction failed: ${reason}. Please try again.`,
         data: { type: 'TRANSACTION_FAILED', transactionId: String(transactionId), reason, screen: 'TransactionDetailScreen' },
     }),
