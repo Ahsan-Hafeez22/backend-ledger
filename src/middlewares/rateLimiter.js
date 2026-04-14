@@ -26,7 +26,7 @@ export const authLimiter = rateLimit({
 
 export const otpLimiter = rateLimit({
     windowMs: 10 * 60 * 1000,
-    max: 25,                           // ✅ Strict — this is now the enforcer for OTP routes
+    max: 200,                           // ✅ Strict — this is now the enforcer for OTP routes
     message: {
         statusCode: 429,
         status: "failed",
@@ -38,7 +38,7 @@ export const otpLimiter = rateLimit({
 
 export const sensitiveLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: 100,
+    max: 200,
     message: {
         statusCode: 429,
         status: "failed",
