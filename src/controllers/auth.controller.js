@@ -1181,7 +1181,7 @@ async function logoutAllDevices(req, res) {
 
 
 
-export default {
+export {
     currentUser,
     register,
     login,
@@ -1197,5 +1197,5 @@ export default {
     googleAuth,
     deleteAccount,
     registerDevice,
-    getUserDevices
+    getUserDevices,
 };

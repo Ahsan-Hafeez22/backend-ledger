@@ -52,11 +52,6 @@ async function createAccount(req, resp) {
 async function changeAccountStatus(req, resp) {
     try {
         const { status } = req.params;
-        const VALID_STATUSES = ['ACTIVE', 'CLOSED', 'FROZEN'];
-
-        if (!VALID_STATUSES.includes(status)) {
-            return resp.status(400).json({ message: "Invalid status" });
-        }
 
         const account = await accountModel.findOne({ user: req.user._id });
 
@@ -89,9 +84,6 @@ async function changeAccountStatus(req, resp) {
 async function changePin(req, resp) {
     try {
         const { oldPin, newPin } = req.body;
-        if (oldPin === newPin) {
-            return resp.status(400).json({ message: "Old and new pin cannot be same" });
-        }
         const user = req.user;
 
         // ✅ Fix 1: added const
@@ -178,4 +170,10 @@ async function getAccountBalance(req, resp) {
         });
     }
 }
-export default { createAccount, getAccount, getAccountBalance, changeAccountStatus, changePin };
+export {
+    createAccount,
+    getAccount,
+    getAccountBalance,
+    changeAccountStatus,
+    changePin,
+};

@@ -83,3 +83,23 @@ export const verifyPinDTO = z.object({
         .length(4, 'Pin must be exactly 4 digits')
         .regex(/^\d+$/, 'Pin must contain only numbers')
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /transactions/initial-funds
+// System-only route. What we expect: toAccount, amount, idempotencyKey
+// ─────────────────────────────────────────────────────────────────────────────
+export const createInitialFundsDTO = z.object({
+    toAccount: z
+        .string({ required_error: 'toAccount is required' })
+        .trim()
+        .min(1, 'toAccount cannot be empty'),
+
+    amount: z
+        .number({ required_error: 'amount is required' })
+        .positive('Amount must be greater than 0')
+        .max(1_000_000, 'Amount cannot exceed 1,000,000'),
+
+    idempotencyKey: z
+        .string({ required_error: 'idempotencyKey is required' })
+        .uuid('idempotencyKey must be a valid UUID'),
+});

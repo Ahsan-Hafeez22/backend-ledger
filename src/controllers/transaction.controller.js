@@ -156,13 +156,6 @@ async function createInitialFundTransaction(req, resp) {
     try {
         const { toAccount, amount, idempotencyKey } = req.body;
 
-
-        if (!toAccount || !amount || !idempotencyKey) {
-            return resp.status(400).json({
-                message: "toAccount, amount and idempotencyKey are required"
-            })
-        }
-
         const toUserAccount = await accountModel.findOne({
             accountNumber: toAccount,
         })
@@ -453,4 +446,11 @@ async function verifyPin(req, resp) {
 
     }
 }
-export default { createTransaction, createInitialFundTransaction, getTransactionDetail, getTransactions, getTransactionByIdempotencyKey, verifyPin };
+export {
+    createTransaction,
+    createInitialFundTransaction,
+    getTransactionDetail,
+    getTransactions,
+    getTransactionByIdempotencyKey,
+    verifyPin,
+};

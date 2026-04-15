@@ -92,7 +92,8 @@ export const registerDto = z.object({
      */
     phone: z
         .string()
-        .regex(/^\+?[0-9\s\-\(\)]+$/, 'Invalid phone number format'),
+        .regex(/^\+?[0-9\s\-\(\)]+$/, 'Invalid phone number format')
+        .optional(),
 
 
     dateOfBirth: z.string().optional(),
@@ -209,10 +210,17 @@ export const registerDeviceDto = z.object({
         .trim(),
 
     deviceType: z
-        .enum(['A', 'I', 'W'], {
+        .enum(['android', 'ios', 'web', 'A', 'I', 'W'], {
             errorMap: () => ({ message: 'Invalid device type' }),
         })
-        .optional(),
+        .optional()
+        .transform((v) => {
+            if (!v) return undefined;
+            if (v === 'A') return 'android';
+            if (v === 'I') return 'ios';
+            if (v === 'W') return 'web';
+            return v;
+        }),
 
     deviceName: z
         .string()
@@ -241,7 +249,18 @@ export const changePasswordDto = z
  * First arg:  a function that returns true (valid) or false (invalid)
  * Second arg: the error config if the check fails
  */
-// .refine((data) => data.oldPassword !== data.newPassword, {
-//     message: 'New password cannot be the same as your current password',
-//     path: ['newPassword'], // Which field the error is attached to
-// });
+    .refine((data) => data.oldPassword !== data.newPassword, {
+        message: 'New password cannot be the same as your current password',
+        path: ['newPassword'],
+    });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/logout
+// What we expect: deviceId (so server can deactivate that device)
+// ─────────────────────────────────────────────────────────────────────────────
+export const logoutDto = z.object({
+    deviceId: z
+        .string({ required_error: 'deviceId is required' })
+        .min(3, 'Invalid deviceId')
+        .trim(),
+});

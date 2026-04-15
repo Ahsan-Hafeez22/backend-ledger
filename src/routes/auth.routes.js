@@ -1,5 +1,5 @@
 import express from "express";
-import authController from "../controllers/auth.controller.js";
+import * as authController from "../controllers/auth.controller.js";
 import authMiddleware from "../middlewares/auth.middleware.js";
 const router = express.Router();
 import { validate } from "../middlewares/validation.middleware.js";
@@ -13,7 +13,8 @@ import {
     verifyResetOtpDto,
     resetPasswordDto,
     changePasswordDto,
-    registerDeviceDto
+    registerDeviceDto,
+    logoutDto
 } from "../validators/auth.validator.js";
 import { otpLimiter, sensitiveLimiter } from "../middlewares/rateLimiter.js";
 
@@ -22,7 +23,7 @@ router.post("/register", validate(registerDto), authController.register);
 router.post("/verify-otp", validate(verifyOtpDto), otpLimiter, authController.verifyOtp);
 router.post("/resend-otp", validate(resendOtpDto), otpLimiter, authController.resendOtp);
 router.post("/login", validate(loginDto), authController.login);
-router.post("/logout", authMiddleware.authMiddleware, authController.logout);
+router.post("/logout", authMiddleware.authMiddleware, validate(logoutDto), authController.logout);
 router.post("/logout-all-devices", authMiddleware.authMiddleware, authController.logoutAllDevices);
 router.post("/refresh-token", validate(refreshTokenDto), authController.refreshToken);
 router.post("/forgot-password", validate(forgotPasswordDto), sensitiveLimiter, authController.forgotPassword);

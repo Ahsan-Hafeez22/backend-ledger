@@ -1,5 +1,5 @@
 import express from 'express';
-import transactionController from '../controllers/transaction.controller.js';
+import * as transactionController from '../controllers/transaction.controller.js';
 import authMiddleware from '../middlewares/auth.middleware.js';
 import {
     createTransactionDTO,
@@ -7,6 +7,7 @@ import {
     checkTransactionStatusDTO,
     transactionIdDTO,
     verifyPinDTO,
+    createInitialFundsDTO,
 } from "../validators/transaction.validator.js";
 import { validate } from "../middlewares/validation.middleware.js";
 
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post(
     '/initial-funds',
     authMiddleware.authSystemMiddleware,
+    validate(createInitialFundsDTO, 'body'),
     transactionController.createInitialFundTransaction
 );
 
@@ -32,7 +34,7 @@ router.post(
     authMiddleware.authMiddleware,
     validate(verifyPinDTO, 'body'),
     transactionController.verifyPin
-)
+);
 router.get('/transactions',
     authMiddleware.authMiddleware,
     validate(getTransactionsDTO, 'query'),
