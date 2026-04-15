@@ -15,7 +15,7 @@ export const Payloads = {
 
     accountFrozen: ({ reason = 'suspicious activity' }) => ({
         title: '🔒 Account Frozen',
-        body: `Your account has been frozen due to ${reason}. Contact support.`,
+        body: `Your account has been frozen due to ${reason}. Wait for a while and try again.`,
         data: { type: 'ACCOUNT_FROZEN', reason, screen: 'SupportScreen' },
     }),
     testNotification: () => ({
@@ -31,7 +31,7 @@ export const Payloads = {
     }),
 
     accountCreationSuccess: ({ accountNumber }) => ({
-        title: '🎉 Account Created Successfully',
+        title: '🎉 Account Created',
         body: `Your account (${accountNumber}) has been successfully created. You can now start transactions.`,  // ✅ typo fixed
         data: { type: 'ACCOUNT_CREATION_SUCCESS', screen: 'AccountScreen' },
     }),

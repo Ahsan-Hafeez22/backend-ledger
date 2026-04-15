@@ -3,7 +3,7 @@ import accountModel from "../models/account.model.js";
 import userModel from "../models/user.model.js";
 import ledgerModel from "../models/ledger.model.js";
 import mongoose from "mongoose";
-import { onMoneySent } from './notification.controller.js';
+import { onMoneySent, onAccountFreeze } from './notification.controller.js';
 import emailService from '../services/email.service.js';
 
 async function createTransaction(req, resp) {
@@ -423,7 +423,11 @@ async function verifyPin(req, resp) {
                 account.pinLockedUntil = new Date(Date.now() + 60 * 60 * 1000);
                 account.pinAttempt = 0;
                 await account.save();
-
+                onAccountFreeze({
+                    recipientUserId: req.user._id,
+                    accountNumber: account.accountNumber,
+                    reason: 'Too many wrong pin attempts'
+                });
                 return resp.status(403).json({
                     message: "Too many failed attempts. Account frozen for 1 hour.",
                     lockedUntil: account.pinLockedUntil,

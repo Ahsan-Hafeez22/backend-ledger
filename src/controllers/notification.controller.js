@@ -53,6 +53,20 @@ export const onAccountCreation = async ({ accountNumber, recipientUserId }) => {
     }
 };
 
+
+export const onAccountFreeze = async ({ accountNumber, recipientUserId, reason }) => {
+    try {
+        await notify(
+            recipientUserId,
+            'ACCOUNT_FREEZE',
+            Payloads.accountFrozen({ reason }),
+            'ACCOUNT_FREEZED',
+        );
+    } catch (err) {
+        logger.error('[Notification] onAccountFreezea error:', err);
+    }
+};
+
 // ─── Admin HTTP routes ────────────────────────────────────────────────────────
 
 // POST /notifications/freeze-account

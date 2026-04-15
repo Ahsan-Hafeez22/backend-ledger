@@ -2,7 +2,6 @@ import accountModel from '../models/account.model.js';
 import { onAccountCreation } from './notification.controller.js';
 
 
-
 async function createAccount(req, resp) {
     try {
         const { accountTitle, pin } = req.body;
@@ -68,9 +67,9 @@ async function changeAccountStatus(req, resp) {
         if (account.status === status) {
             return resp.status(400).json({ message: `Account is already ${status}` });
         }
-
         account.status = status;
         await account.save();
+
 
         return resp.status(200).json({
             message: "Account status changed successfully",
