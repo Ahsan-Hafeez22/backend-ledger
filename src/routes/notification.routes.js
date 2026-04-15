@@ -13,6 +13,13 @@ router.get(
     notificationController.listMyNotifications
 );
 
+router.get(
+    '/unread-notifications',
+    apiLimiter,
+    authMiddleware.authMiddleware,
+    notificationController.getUnreadCount
+);
+
 // Mark one notification as read
 router.patch(
     '/:id/read',
@@ -23,7 +30,7 @@ router.patch(
 
 
 // Mark All notification as read
-router.post(
+router.patch(
     '/mark-all-as-read',
     apiLimiter,
     authMiddleware.authMiddleware,

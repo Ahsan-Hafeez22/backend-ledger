@@ -1,5 +1,5 @@
 import accountModel from '../models/account.model.js';
-import bcrypt from 'bcrypt';
+import { onAccountCreation } from './notification.controller.js';
 
 
 
@@ -17,6 +17,21 @@ async function createAccount(req, resp) {
             });
         }
         const account = await accountModel.create({ user: user._id, accountTitle, pin });
+        /*
+         onMoneySent({
+                    senderUserId: req.user._id,
+                    recipientUserId: toUserAccount.user,
+                    senderName: req.user.name,
+                    recipientName: toUser?.name ?? 'Recipient',
+                    amount,
+                    currency: fromUserAccount.currency,
+                    transactionId: transaction._id,
+                });
+         */
+        onAccountCreation({
+            recipientUserId: user._id,
+            accountNumber: account.accountNumber
+        })
         return resp.status(201).json(
             {
                 statusCode: 201,
@@ -24,6 +39,7 @@ async function createAccount(req, resp) {
                 message: "Account created successfully",
                 account: account
             }
+
         );
     } catch (error) {
         console.error("[createAccount]", error);

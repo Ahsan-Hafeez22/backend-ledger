@@ -18,6 +18,11 @@ export const Payloads = {
         body: `Your account has been frozen due to ${reason}. Contact support.`,
         data: { type: 'ACCOUNT_FROZEN', reason, screen: 'SupportScreen' },
     }),
+    testNotification: () => ({
+        title: 'Test Notificatoin',
+        body: `This notification has been send for the postman for testing purpose`,
+        data: { type: 'Test Notification', "message": "This notification has been send for the postman for testing purpose", screen: '' },
+    }),
 
     accountSuspended: ({ untilDate }) => ({
         title: '⛔ Account Suspended',

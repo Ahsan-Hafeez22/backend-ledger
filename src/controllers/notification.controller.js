@@ -44,8 +44,8 @@ export const onAccountCreation = async ({ accountNumber, recipientUserId }) => {
     try {
         await notify(
             recipientUserId,
-            'ACCOUNT_CREATED',                                    // ✅ correct type
-            Payloads.accountCreationSuccess({ accountNumber }),   // ✅ correct payload
+            'ACCOUNT_CREATED',
+            Payloads.accountCreationSuccess({ accountNumber }),
             'ACCOUNT_CREATED_SUCCESSFULLY',
         );
     } catch (err) {
@@ -119,6 +119,24 @@ export const listMyNotifications = async (req, res) => {
     }
 };
 
+// GET /api/notifications?limit=20&cursor=<ISO string>
+export const getUnreadCount = async (req, res) => {
+    try {
+        const count = await notificationModel.countDocuments({
+            user: req.user._id,
+            $or: [{ readAt: null }, { readAt: { $exists: false } }]
+        }); return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Unread Count",
+            count: count
+        });
+    } catch (err) {
+        logger.error('[Notification] listMyNotifications error:', err);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
 
 // Test Notification: — manual push test endpoint
 // POST /api/notifications/test-token
@@ -146,6 +164,9 @@ export const testSendToToken = async (req, res) => {
             imageUrl,
             data,
         });
+        await notify(req.user._id, 'Test notification', Payloads.testNotification());
+
+
         return res.status(200).json({ message: 'Notification attempted', result });
     } catch (err) {
         logger.error('[Notification] testSendToToken error:', err);

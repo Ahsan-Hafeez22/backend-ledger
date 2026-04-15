@@ -11,6 +11,7 @@ import tokenBlackList from "../models/blacklist.model.js";
 import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
 import authUtils from "../utils/auth.utils.js";
+import logger from "../utils/logger.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
 // Body: { email, name, password, ...anyExtraFields }
@@ -659,7 +660,15 @@ async function currentUser(req, res) {
 async function logout(req, res) {
     try {
         const token = req.headers.authorization?.split(" ")[1];
+        const { deviceId } = req.body ?? {};
 
+        if (!deviceId) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "No device id provided",
+            });
+        }
         if (!token) {
             return res.status(400).json({
                 statusCode: 400,
@@ -669,7 +678,17 @@ async function logout(req, res) {
         }
 
         await tokenBlackList.create({ token });
-
+        await userModel.updateOne(
+            { _id: req.user._id, "fcmTokens.deviceId": deviceId },
+            {
+                $set: {
+                    "fcmTokens.$.isActive": false,
+                    "fcmTokens.$.notificationsEnabled": false,
+                    "fcmTokens.$.invalidAt": new Date(),
+                    "fcmTokens.$.lastUsed": new Date(),
+                },
+            },
+        );
         return res.status(200).json({
             statusCode: 200,
             status: "success",
@@ -1125,13 +1144,31 @@ async function deleteAccount(req, res) {
 // Logout all the account and makes the FCM token list empty
 // ─────────────────────────────────────────────────────────────────────────────
 async function logoutAllDevices(req, res) {
-    const { userId } = req.user;
     try {
-        await userModel.findByIdAndUpdate(userId, { $set: { fcmTokens: [] } });
-        logger.info(`[Auth] All devices logged out for user ${userId}`);
-        await tokenBlackList.create({ token });
-        return res.json({ message: 'Logged out from all devices' });
+        const userId = req.user?._id;
+        const token = req.headers.authorization?.split(" ")[1];
 
+        await userModel.updateOne(
+            { _id: userId },
+            {
+                $set: {
+                    "fcmTokens.$[].isActive": false,
+                    "fcmTokens.$[].notificationsEnabled": false,
+                    "fcmTokens.$[].invalidAt": new Date(),
+                    "fcmTokens.$[].lastUsed": new Date(),
+                },
+            },
+        );
+
+        await refreshTokenModel.deleteMany({ userId });
+        if (token) await tokenBlackList.create({ token });
+
+        logger.info(`[Auth] All devices logged out for user ${userId}`);
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Logged out from all devices",
+        });
     } catch (err) {
         logger.error('[Auth] Logout-all error:', err);
         return res.status(500).json({
