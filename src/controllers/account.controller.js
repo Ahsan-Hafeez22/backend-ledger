@@ -1,4 +1,5 @@
 import accountModel from '../models/account.model.js';
+import benificiaryModel from '../models/benificiary.model.js';
 import { onAccountCreation } from './notification.controller.js';
 
 
@@ -170,10 +171,111 @@ async function getAccountBalance(req, resp) {
         });
     }
 }
+// Get Account /account/getRecipientAccount/:accountNumber
+async function getRecipientAccount(req, res) {
+    try {
+        const { accountNumber } = req.params;
+        const isAccountExsist = await accountModel.findOne({ accountNumber: accountNumber });
+        if (isAccountExsist) {
+            return res.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "No Account available",
+            })
+        }
+        return res.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Account fetch Successfully",
+            accounts: isAccountExsist
+        });
+
+    }
+    catch (error) {
+        console.error("[Get Recipient Account]", error);
+        return res.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+
+    }
+}
+
+async function addBenificiary(req, resp) {
+    try {
+        const { accountNumber, nickname } = req.body;
+
+        const myAccount = await accountModel.findOne({ user: req.user.id });
+        const isAccountExsist = await accountModel.findOne({
+            accountNumber: accountNumber,
+        });
+        if (!isAccountExsist) {
+            return resp.status(404).json({ message: "Account not found" });
+        }
+        const beneficiary = await benificiaryModel.create({ savedBy: myAccount._id, account: isAccountExsist._id, nickname });
+        return resp.status(201).json({
+            statusCode: 201,
+            status: "success",
+            message: "Benificiary Added Successfully",
+            beneficiary: beneficiary
+        });
+    } catch (error) {
+        console.error("[Add Benificiary]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
+async function getBenificiary(req, resp) {
+    try {
+        // GET /api/beneficiaries
+        const myAccount = await accountModel.findOne({ user: req.user.id });
+
+        const beneficiaries = await benificiaryModel.find({ savedBy: myAccount._id })
+            .populate({
+                path: 'account',
+                select: 'accountNumber accountTitle',
+                populate: {
+                    path: 'user',
+                    select: 'name'
+                }
+            });
+
+        if (beneficiaries.length === 0) {
+            return resp.status(404).json({
+                statusCode: 404,
+                status: "failed",
+                message: "No beneficiaries found",
+            });
+        };
+
+        return resp.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Benificiary fetch Successfully",
+            beneficiaries: beneficiaries
+        });
+    } catch (error) {
+        console.error("[Get Benificiary]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
 export {
     createAccount,
     getAccount,
     getAccountBalance,
+    getRecipientAccount,
     changeAccountStatus,
     changePin,
+    getBenificiary,
+    addBenificiary,
 };

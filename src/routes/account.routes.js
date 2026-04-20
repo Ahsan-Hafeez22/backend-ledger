@@ -16,6 +16,7 @@ router.post('/create-account', authMiddleware.authMiddleware, validate(createAcc
 router.patch('/change-account-status/:status', authMiddleware.authMiddleware, validate(changeAccountStatusParamsDTO, 'params'), sensitiveLimiter, accountController.changeAccountStatus);
 router.get('/account', authMiddleware.authMiddleware, sensitiveLimiter, accountController.getAccount);
 router.get('/balance/:accountNumber', authMiddleware.authMiddleware, validate(accountNumberParamsDTO, 'params'), sensitiveLimiter, accountController.getAccountBalance);
+router.post('/add-benificiary', authMiddleware.authMiddleware, sensitiveLimiter, accountController.addBenificiary);
 router.post('/change-pin', authMiddleware.authMiddleware, validate(changePinDTO), sensitiveLimiter, accountController.changePin);
 
 export default router;
