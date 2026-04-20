@@ -1,5 +1,5 @@
 // src/controllers/notificationController.js
-import NotificationService from '../services/notificationService.js';
+import NotificationService from '../services/notification.service.js';
 import { Payloads } from '../services/notificationPayloads.js';
 import userModel from '../models/user.model.js';
 import notificationModel from '../models/notification.model.js';

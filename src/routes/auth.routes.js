@@ -17,6 +17,8 @@ import {
     logoutDto
 } from "../validators/auth.validator.js";
 import { otpLimiter, sensitiveLimiter } from "../middlewares/rateLimiter.js";
+import { uploadAvatar } from "../middlewares/upload.middleware.js";
+
 
 router.get("/user", authMiddleware.authMiddleware, authController.currentUser);
 router.post("/register", validate(registerDto), authController.register);
@@ -34,6 +36,13 @@ router.post("/google-auth", sensitiveLimiter, authController.googleAuth);
 router.delete("/delete-user", sensitiveLimiter, authController.deleteAccount);
 router.post("/register-device", sensitiveLimiter, validate(registerDeviceDto), authMiddleware.authMiddleware, authController.registerDevice);
 router.get("/get-registered-device", sensitiveLimiter, authMiddleware.authMiddleware, authController.getUserDevices);
+router.patch(
+    "/profile",
+    authMiddleware.authMiddleware,
+    sensitiveLimiter,
+    uploadAvatar,
+    authController.editProfile
+);
 
 // router.post("/logout-all")
 // router.post("/update-profile")

@@ -12,6 +12,7 @@ import refreshTokenModel from "../models/refresh.model.js";
 import pendingUserModel from "../models/pendingUser.model.js";
 import authUtils from "../utils/auth.utils.js";
 import logger from "../utils/logger.js";
+import storage from "../services/storage.service.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/register
 // Body: { email, name, password, ...anyExtraFields }
@@ -1181,6 +1182,71 @@ async function logoutAllDevices(req, res) {
 
 
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/edit-profile
+// ─────────────────────────────────────────────────────────────────────────────
+async function editProfile(req, resp) {
+    try {
+        const { name, phone, dateOfBirth } = req.body ?? {};
+        console.log("req.body", req.body);
+        // Only allow safe fields to be updated
+        const updates = {};
+        if (name) updates.name = name.trim();
+        if (phone) updates.phone = phone.trim();
+        if (dateOfBirth) updates.dateOfBirth = new Date(dateOfBirth);
+
+        // If avatar file is attached, upload to ImageKit
+        if (req.file) {
+            const fileName = `avatar_${req.user._id}_${Date.now()}`;
+            const uploadResult = await storage.uploadImage(req.file.buffer, fileName);
+            updates.avatar = uploadResult.url; // save the ImageKit URL
+        }
+
+        // Nothing to update
+        if (Object.keys(updates).length === 0) {
+            console.log("No valid fields provided to update");
+            return resp.status(400).json({
+                statusCode: 400,
+                status: "failed",
+                message: "No valid fields provided to update"
+            });
+        }
+
+        const updatedUser = await userModel.findByIdAndUpdate(
+            req.user._id,
+            { $set: updates },
+            { returnDocument: 'after', runValidators: true }
+        );
+
+        return resp.status(200).json({
+            statusCode: 200,
+            status: "success",
+            message: "Profile updated successfully",
+            user: {
+                name: updatedUser.name,
+                phone: updatedUser.phone,
+                avatar: updatedUser.avatar,
+                dateOfBirth: updatedUser.dateOfBirth,
+                country: updatedUser.country,
+                defaultCurrency: updatedUser.defaultCurrency,
+            }
+        });
+
+    } catch (error) {
+        console.error("[Edit Profile]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error"
+        });
+    }
+}
+
+
+
+
+
 export {
     currentUser,
     register,
@@ -1198,4 +1264,5 @@ export {
     deleteAccount,
     registerDevice,
     getUserDevices,
+    editProfile,
 };
