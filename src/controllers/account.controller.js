@@ -204,8 +204,6 @@ async function getRecipientAccount(req, res) {
 
 async function addBenificiary(req, resp) {
     try {
-        const { accountNumber, nickname } = req.body;
-
         const myAccount = await accountModel.findOne({ user: req.user.id });
         const isAccountExsist = await accountModel.findOne({
             accountNumber: accountNumber,

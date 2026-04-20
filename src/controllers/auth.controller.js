@@ -464,7 +464,7 @@ async function login(req, res) {
 
 const MAX_DEVICES = 10;
 
-export const registerDevice = async (req, res) => {
+const registerDevice = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
