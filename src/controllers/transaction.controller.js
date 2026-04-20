@@ -385,6 +385,15 @@ async function verifyPin(req, resp) {
         if (!account) {
             return resp.status(404).json({ message: "Account not found" });
         }
+
+        // Auto-unfreeze when lock window has passed
+        if (account.pinLockedUntil && account.pinLockedUntil <= new Date()) {
+            account.status = 'ACTIVE';
+            account.pinAttempt = 0;
+            account.pinLockedUntil = null;
+            await account.save();
+        }
+
         if (account.pinLockedUntil && account.pinLockedUntil > new Date()) {
             const minutesLeft = Math.ceil(
                 (account.pinLockedUntil - new Date()) / 1000 / 60
@@ -399,6 +408,7 @@ async function verifyPin(req, resp) {
         if (pinMatch) {
             account.pinAttempt = 0;
             account.pinLockedUntil = null;
+            if (account.status === 'FROZEN') account.status = 'ACTIVE';
             await account.save();
 
             return resp.status(200).json({

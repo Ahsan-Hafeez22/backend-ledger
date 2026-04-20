@@ -120,7 +120,9 @@ async function changePin(req, resp) {
 async function getAccount(req, resp) {
     try {
         const user = req.user;
-        const account = await accountModel.findOne({ user: user._id });
+        const account = await accountModel
+            .findOne({ user: user._id })
+            .select('+pinAttempt +pinLockedUntil');
         if (!account) {
             return resp.status(400).json({
                 statusCode: 400,
@@ -128,11 +130,27 @@ async function getAccount(req, resp) {
                 message: "No Account available",
             })
         }
+
+        // If the timed PIN lock has expired, restore ACTIVE status automatically.
+        // Note: If you later add admin/security freezes, gate this by a freeze reason.
+        if (
+            account.status === 'FROZEN' &&
+            account.pinLockedUntil &&
+            account.pinLockedUntil <= new Date()
+        ) {
+            account.status = 'ACTIVE';
+            account.pinAttempt = 0;
+            account.pinLockedUntil = null;
+            await account.save();
+        }
+
+        // Re-fetch without sensitive lock fields (select:false by default)
+        const cleanAccount = await accountModel.findOne({ user: user._id });
         return resp.status(200).json({
             statusCode: 200,
             status: "success",
             message: "Account fetch Successfully",
-            accounts: account
+            accounts: cleanAccount
         });
     } catch (error) {
         console.error("[getAccount]", error);
@@ -176,12 +194,12 @@ async function getRecipientAccount(req, res) {
     try {
         const { accountNumber } = req.params;
         const isAccountExsist = await accountModel.findOne({ accountNumber: accountNumber });
-        if (isAccountExsist) {
-            return res.status(400).json({
-                statusCode: 400,
+        if (!isAccountExsist) {
+            return res.status(404).json({
+                statusCode: 404,
                 status: "failed",
-                message: "No Account available",
-            })
+                message: "Account not found",
+            });
         }
         return res.status(200).json({
             statusCode: 200,
@@ -204,20 +222,47 @@ async function getRecipientAccount(req, res) {
 
 async function addBenificiary(req, resp) {
     try {
-        const myAccount = await accountModel.findOne({ user: req.user.id });
-        const isAccountExsist = await accountModel.findOne({
-            accountNumber: accountNumber,
-        });
+        const { accountNumber, nickname } = req.body ?? {};
+
+        // 1. Find your own account
+        const myAccount = await accountModel.findOne({ user: req.user._id });
+        if (!myAccount) {
+            return resp.status(404).json({ message: "Your account not found" });
+        }
+
+        // 2. Find the target account by accountNumber first
+        const isAccountExsist = await accountModel.findOne({ accountNumber });
         if (!isAccountExsist) {
             return resp.status(404).json({ message: "Account not found" });
         }
-        const beneficiary = await benificiaryModel.create({ savedBy: myAccount._id, account: isAccountExsist._id, nickname });
+
+        // 3. Self-add check
+        if (String(isAccountExsist._id) === String(myAccount._id)) {
+            return resp.status(400).json({ message: "You cannot add your own account as beneficiary" });
+        }
+
+        // 4. ✅ Now use ObjectId for duplicate check
+        const alreadyAdded = await benificiaryModel.findOne({
+            savedBy: myAccount._id,
+            account: isAccountExsist._id
+        });
+        if (alreadyAdded) {
+            return resp.status(400).json({ message: "Beneficiary already added" });
+        }
+
+        // 5. Create beneficiary
+        await benificiaryModel.create({
+            savedBy: myAccount._id,
+            account: isAccountExsist._id,
+            nickname
+        });
+
         return resp.status(201).json({
             statusCode: 201,
             status: "success",
-            message: "Benificiary Added Successfully",
-            beneficiary: beneficiary
+            message: "Beneficiary Added Successfully",
         });
+
     } catch (error) {
         console.error("[Add Benificiary]", error);
         return resp.status(500).json({
@@ -228,9 +273,40 @@ async function addBenificiary(req, resp) {
     }
 }
 
+async function deleteBenificiary(req, resp) {
+    try {
+        const { id } = req.params;
+
+        // Find the user's account first
+        const myAccount = await accountModel.findOne({ user: req.user._id });
+        if (!myAccount) {
+            return resp.status(404).json({ message: "Your account not found" });
+        }
+
+        // Now match using account._id, not user._id
+        const deleted = await benificiaryModel.findOneAndDelete({
+            _id: id,
+            savedBy: myAccount._id  // ✅ correct
+        });
+
+        if (!deleted) {
+            return resp.status(404).json({ message: "Beneficiary not found" });
+        }
+
+        return resp.status(200).json({ message: "Beneficiary deleted successfully" });
+
+    } catch (error) {
+        console.error("[Delete Benificiary]", error);
+        return resp.status(500).json({
+            statusCode: 500,
+            status: "failed",
+            message: "Internal server error",
+        });
+    }
+}
+
 async function getBenificiary(req, resp) {
     try {
-        // GET /api/beneficiaries
         const myAccount = await accountModel.findOne({ user: req.user.id });
 
         const beneficiaries = await benificiaryModel.find({ savedBy: myAccount._id })
@@ -243,20 +319,22 @@ async function getBenificiary(req, resp) {
                 }
             });
 
-        if (beneficiaries.length === 0) {
-            return resp.status(404).json({
-                statusCode: 404,
-                status: "failed",
-                message: "No beneficiaries found",
-            });
-        };
+        // Clean and shape the response
+        const formattedBeneficiaries = beneficiaries.map(b => ({
+            id: b._id,
+            nickname: b.nickname,
+            account_title: b.account.accountTitle,
+            account_number: b.account.accountNumber,
+            user_name: b.account.user.name,
+        }));
 
         return resp.status(200).json({
             statusCode: 200,
             status: "success",
-            message: "Benificiary fetch Successfully",
-            beneficiaries: beneficiaries
+            message: "Beneficiaries fetched successfully",
+            beneficiaries: formattedBeneficiaries
         });
+
     } catch (error) {
         console.error("[Get Benificiary]", error);
         return resp.status(500).json({
@@ -276,4 +354,5 @@ export {
     changePin,
     getBenificiary,
     addBenificiary,
+    deleteBenificiary,
 };
