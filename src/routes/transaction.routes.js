@@ -58,14 +58,4 @@ router.get(
 
 export default router;
 
-/*
-
-router.post('/initial-funds', authMiddleware.authSystemMiddleware, transactionController.createInitialFundTransaction);
-router.post('/create-transaction', authMiddleware.authMiddleware, transactionController.createTransaction);
-router.get('/get-transactions/:transactionId', authMiddleware.authMiddleware, transactionController.getTransactionDetail);
-router.get('/transactions', authMiddleware.authMiddleware, transactionController.getTransactions);
-router.get('/check-status', authMiddleware.authMiddleware, transactionController.getTransactionByIdempotencyKey);
-
-*/
-
 // Pin verificaton added  if the user add 3 wrong pin the account will be FROZEN for one hour.

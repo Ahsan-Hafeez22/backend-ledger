@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes.js';
 import accountRoutes from './routes/account.routes.js';
 import transactionRoutes from './routes/transaction.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import chatRoutes from './routes/chat.routes.js';
 
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter.js';
 
@@ -22,5 +23,6 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/account', apiLimiter, accountRoutes);
 app.use('/api/transaction', apiLimiter, transactionRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/chat', apiLimiter, chatRoutes);
 
 export default app;

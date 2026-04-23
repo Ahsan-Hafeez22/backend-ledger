@@ -140,6 +140,15 @@ const userSchema = new mongoose.Schema({
         immutable: true,
         select: false
     },
+    lastSeen: {
+        type: Date,
+        default: Date.now
+    }
+    ,
+    isOnline: {
+        type: Boolean,
+        default: false
+    }
 
 }, {
     timestamps: true

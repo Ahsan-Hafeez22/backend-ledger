@@ -326,6 +326,7 @@ async function getBenificiary(req, resp) {
             account_title: b.account.accountTitle,
             account_number: b.account.accountNumber,
             user_name: b.account.user.name,
+            user_id: b.account.user._id,
             email: b.account.user.email,
             avatar: b.account.user.avatar
         }));
